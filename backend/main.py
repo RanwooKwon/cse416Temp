@@ -23,7 +23,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # ---------------------- DATABASE SETUP ---------------------- #
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -246,7 +246,7 @@ class NearestLotsRequest(BaseModel):
     )
 
 
-async def get_current_user(
+def get_current_user(
     token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)
 ):
     credentials_exception = HTTPException(
@@ -272,7 +272,7 @@ async def get_current_user(
     return user
 
 
-async def get_current_admin(
+def get_current_admin(
     current_user: dict = Depends(get_current_user),
     db: sqlite3.Connection = Depends(get_db),
 ):
@@ -323,7 +323,7 @@ async def favicon():
 
 
 @app.post("/token", response_model=Token)
-async def login_for_access_token(
+def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: sqlite3.Connection = Depends(get_db),
 ):
