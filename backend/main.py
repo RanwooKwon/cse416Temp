@@ -499,6 +499,22 @@ def get_parking_lots(db: sqlite3.Connection = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@app.get("/parking/campus/list", response_model=List[str])
+def get_campus_list(db: sqlite3.Connection = Depends(get_db)):
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT DISTINCT substr(location, instr(location, ', ') + 2) AS campus FROM parking_lots ORDER BY campus")
+        results = cursor.fetchall()
+        
+        campuses = [row["campus"] for row in results if row["campus"]]
+        return campuses
+    except Exception as e:
+        import traceback
+        print(f"ERROR in get_campus_list: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 @app.get("/parking/campus/{campus}", response_model=List[ParkingLotOut])
 def get_parking_lots_by_campus(campus: str, db: sqlite3.Connection = Depends(get_db)):
     try:
