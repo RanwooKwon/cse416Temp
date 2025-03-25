@@ -1,3 +1,4 @@
+import { Navbar } from "@/components/navbar"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -14,9 +15,15 @@ export default function Home() {
             <Link href="/reservations">
               <Button size="lg">Make a Reservation</Button>
             </Link>
+            <Link href="/about">
+              <Button size="lg" variant="outline">
+                Learn More
+              </Button>
+            </Link>
           </div>
         </div>
       </main>
     </div>
   )
 }
+

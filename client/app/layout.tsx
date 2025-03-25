@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import Navbar from "@/components/navbar" // Updated import
+import { Navbar } from "@/components/navbar" // Updated to use named import
 
 const inter = Inter({ subsets: ["latin"] })
 
