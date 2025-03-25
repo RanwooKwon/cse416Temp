@@ -20,6 +20,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+
 # ---------------------- DATABASE SETUP ---------------------- #
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -29,18 +30,24 @@ def get_db():
     finally:
         conn.close()
 
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def get_password_hash(password):
     return pwd_context.hash(password)
 
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
@@ -136,13 +143,20 @@ class UserBase(BaseModel):
 
     @validator("userType")
     def validate_user_type(cls, v):
-        valid_types = ["Faculty member", "Non-resident student", "Resident student", "Visitor"]
+        valid_types = [
+            "Faculty member",
+            "Non-resident student",
+            "Resident student",
+            "Visitor",
+        ]
         if v not in valid_types:
             raise ValueError(f"userType must be one of {valid_types}")
         return v
 
+
 class UserRegister(UserBase):
     password: constr(min_length=12)
+
 
 class UserOut(BaseModel):
     userID: int
@@ -151,24 +165,29 @@ class UserOut(BaseModel):
     phone: Optional[str] = None
     userType: str
 
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str
     userID: int
 
+
 class TokenData(BaseModel):
     email: Optional[str] = None
     userID: Optional[int] = None
+
 
 class ParkingLotCreate(BaseModel):
     name: str
     location: str
     capacity: int
     evSlots: int = 0
+
 
 class ParkingLotOut(BaseModel):
     parkingLotID: int
@@ -178,10 +197,12 @@ class ParkingLotOut(BaseModel):
     evSlots: int
     reserved_slots: int
 
+
 class CarCreate(BaseModel):
     plateNumber: str
     model: str
     isEV: bool = False
+
 
 class CarOut(BaseModel):
     carID: int
@@ -189,11 +210,13 @@ class CarOut(BaseModel):
     model: str
     isEV: bool
 
+
 class ReservationCreate(BaseModel):
     userID: int
     parkingLotID: int
     startTime: datetime
     endTime: datetime
+
 
 class ReservationOut(BaseModel):
     reservationID: int
@@ -204,19 +227,28 @@ class ReservationOut(BaseModel):
     price: float
     reservationStatus: str
 
+
 class PathRequest(BaseModel):
     start_lat: float = Field(..., description="Starting point latitude")
     start_lng: float = Field(..., description="Starting point longitude")
     end_id: int = Field(..., description="Destination parking lot ID")
 
+
 class NearestLotsRequest(BaseModel):
     start_lat: float = Field(..., description="Starting point latitude")
-    start_lng: float = Field(..., description="Starting point longitude") 
+    start_lng: float = Field(..., description="Starting point longitude")
     limit: Optional[int] = Field(5, description="Maximum number of lots to return")
-    min_available: Optional[int] = Field(1, description="Minimum number of available spaces")
-    prefer_ev: Optional[bool] = Field(False, description="Whether to prioritize lots with EV charging")
+    min_available: Optional[int] = Field(
+        1, description="Minimum number of available spaces"
+    )
+    prefer_ev: Optional[bool] = Field(
+        False, description="Whether to prioritize lots with EV charging"
+    )
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)):
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)
+):
     credentials_exception = HTTPException(
         status_code=401,
         detail="Could not validate credentials",
@@ -239,13 +271,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: sqlite3.Conn
         raise credentials_exception
     return user
 
-async def get_current_admin(current_user: dict = Depends(get_current_user), db: sqlite3.Connection = Depends(get_db)):
+
+async def get_current_admin(
+    current_user: dict = Depends(get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
+):
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],))
+    cursor.execute(
+        "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+    )
     admin = cursor.fetchone()
     if admin is None:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     return current_user
+
 
 app = FastAPI()
 
@@ -257,9 +296,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 def on_startup():
     init_db()
+
 
 @app.get("/")
 def read_root():
@@ -275,12 +316,17 @@ def read_root():
         },
     }
 
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse("favicon.ico")
 
+
 @app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: sqlite3.Connection = Depends(get_db)):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: sqlite3.Connection = Depends(get_db),
+):
     cursor = db.cursor()
     cursor.execute("SELECT * FROM users WHERE email = ?", (form_data.username,))
     user = cursor.fetchone()
@@ -304,6 +350,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         "userID": user["userID"],
     }
 
+
 @app.post("/user/register", response_model=UserOut)
 def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
@@ -312,7 +359,15 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
     try:
         cursor.execute(
             "INSERT INTO users (email, userName, phone, password, userType, sbuID, licenseInfo) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (user.email, user.userName, user.phone, hashed_password, user.userType, user.sbuID, user.licenseInfo),
+            (
+                user.email,
+                user.userName,
+                user.phone,
+                hashed_password,
+                user.userType,
+                user.sbuID,
+                user.licenseInfo,
+            ),
         )
         db.commit()
         user_id = cursor.lastrowid
@@ -326,6 +381,7 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
         phone=user.phone,
         userType=user.userType,
     )
+
 
 @app.post("/user/login")
 def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):
@@ -344,17 +400,29 @@ def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):
 
     return {"token": access_token, "userId": row["userID"]}
 
+
 @app.get("/user/{user_id}", response_model=UserOut)
-def get_user(user_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_user(
+    user_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     if current_user["userID"] != user_id:
         admin_cursor = db.cursor()
-        admin_cursor.execute("SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],))
+        admin_cursor.execute(
+            "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+        )
         admin = admin_cursor.fetchone()
         if admin is None:
-            raise HTTPException(status_code=403, detail="Not authorized to view this user's information")
-    
+            raise HTTPException(
+                status_code=403, detail="Not authorized to view this user's information"
+            )
+
     cursor = db.cursor()
-    cursor.execute("SELECT userID, userName, email, phone, userType FROM users WHERE userID = ?", (user_id,))
+    cursor.execute(
+        "SELECT userID, userName, email, phone, userType FROM users WHERE userID = ?",
+        (user_id,),
+    )
     row = cursor.fetchone()
 
     if row is None:
@@ -362,10 +430,18 @@ def get_user(user_id: int, db: sqlite3.Connection = Depends(get_db), current_use
 
     return UserOut(**dict(row))
 
+
 @app.post("/user/{user_id}/cars", response_model=CarOut)
-def add_car(user_id: int, car: CarCreate, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def add_car(
+    user_id: int,
+    car: CarCreate,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     if current_user["userID"] != user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to add cars for this user")
+        raise HTTPException(
+            status_code=403, detail="Not authorized to add cars for this user"
+        )
 
     cursor = db.cursor()
     try:
@@ -376,50 +452,59 @@ def add_car(user_id: int, car: CarCreate, db: sqlite3.Connection = Depends(get_d
         db.commit()
         car_id = cursor.lastrowid
     except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Car with this plate number already exists")
+        raise HTTPException(
+            status_code=400, detail="Car with this plate number already exists"
+        )
 
-    return CarOut(carID=car_id, plateNumber=car.plateNumber, model=car.model, isEV=car.isEV)
+    return CarOut(
+        carID=car_id, plateNumber=car.plateNumber, model=car.model, isEV=car.isEV
+    )
+
 
 @app.get("/user/{user_id}/cars", response_model=List[CarOut])
-def get_cars(user_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_cars(
+    user_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     if current_user["userID"] != user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to view cars for this user")
+        raise HTTPException(
+            status_code=403, detail="Not authorized to view cars for this user"
+        )
 
     cursor = db.cursor()
     cursor.execute("SELECT * FROM cars WHERE userID = ?", (user_id,))
     rows = cursor.fetchall()
     return [CarOut(**dict(row)) for row in rows]
 
+
 # ---------------------- PARKING LOT CRUD ENDPOINTS ---------------------- #
-@app.get("/parking/lots")
-def get_parking_lots():
-    from fastapi.responses import JSONResponse
-    connection = None
+@app.get("/parking/lots", response_model=List[ParkingLotOut])
+def get_parking_lots(db: sqlite3.Connection = Depends(get_db)):
     try:
-        connection = sqlite3.connect("parking.db")
-        connection.row_factory = lambda cursor, row: {
-            column[0]: row[idx] for idx, column in enumerate(cursor.description)
-        }
-        cursor = connection.cursor()
-        cursor.execute("SELECT parkingLotID, name, location, capacity, evSlots, reserved_slots FROM parking_lots")
-        result = cursor.fetchall()
-        return JSONResponse(content=result)
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM parking_lots")
+        lots = cursor.fetchall()
+
+        if not lots:
+            print(f"Warning: No parking lots found in database")
+            return []
+
+        return [ParkingLotOut(**dict(lot)) for lot in lots]
     except Exception as e:
         import traceback
+
         print(f"ERROR in get_parking_lots: {e}")
         print(traceback.format_exc())
-        return JSONResponse(
-            content={"error": str(e), "detail": "Database query failed"},
-            status_code=500
-        )
-    finally:
-        if connection:
-            connection.close()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 
 @app.get("/parking/lots/{parking_lot_id}", response_model=ParkingLotOut)
 def get_parking_lot(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM parking_lots WHERE parkingLotID = ?", (parking_lot_id,))
+    cursor.execute(
+        "SELECT * FROM parking_lots WHERE parkingLotID = ?", (parking_lot_id,)
+    )
     row = cursor.fetchone()
 
     if row is None:
@@ -427,12 +512,23 @@ def get_parking_lot(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db
 
     return ParkingLotOut(**dict(row))
 
+
 @app.post("/parking/lots", response_model=ParkingLotOut)
-def create_parking_lot(parking_lot: ParkingLotCreate, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_admin)):
+def create_parking_lot(
+    parking_lot: ParkingLotCreate,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
+):
     cursor = db.cursor()
     cursor.execute(
         "INSERT INTO parking_lots (name, location, capacity, evSlots, reserved_slots) VALUES (?, ?, ?, ?, ?)",
-        (parking_lot.name, parking_lot.location, parking_lot.capacity, parking_lot.evSlots, 0),
+        (
+            parking_lot.name,
+            parking_lot.location,
+            parking_lot.capacity,
+            parking_lot.evSlots,
+            0,
+        ),
     )
     db.commit()
     lot_id = cursor.lastrowid
@@ -446,37 +542,42 @@ def create_parking_lot(parking_lot: ParkingLotCreate, db: sqlite3.Connection = D
         reserved_slots=0,
     )
 
+
 @app.post("/parking/path")
 def find_path_to_lot_post(request: PathRequest):
     params = {
         "start_lat": request.start_lat,
         "start_lng": request.start_lng,
-        "end_id": request.end_id
+        "end_id": request.end_id,
     }
-    
+
     try:
         return pathfinder.find_path(**params)
     except Exception as e:
         import traceback
+
         print(f"Error in find_path_to_lot_post: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/parking/path")
 def find_path_to_lot_get(start_lat: float, start_lng: float, end_id: int):
     params = {
         "start_lat": float(start_lat),
         "start_lng": float(start_lng),
-        "end_id": int(end_id)
+        "end_id": int(end_id),
     }
-    
+
     try:
         return pathfinder.find_path(**params)
     except Exception as e:
         import traceback
+
         print(f"Error in find_path_to_lot_get: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/parking/nearest")
 def find_nearest_lots_post(request: NearestLotsRequest):
@@ -485,8 +586,9 @@ def find_nearest_lots_post(request: NearestLotsRequest):
         start_lng=request.start_lng,
         limit=request.limit,
         min_available=request.min_available,
-        prefer_ev=request.prefer_ev
+        prefer_ev=request.prefer_ev,
     )
+
 
 @app.get("/parking/nearest")
 def find_nearest_lots_get(
@@ -494,54 +596,69 @@ def find_nearest_lots_get(
     start_lng: float,
     limit: Optional[int] = 5,
     min_available: Optional[int] = 1,
-    prefer_ev: Optional[bool] = False
+    prefer_ev: Optional[bool] = False,
 ):
     return pathfinder.find_nearest_available_lots(
         start_lat=start_lat,
         start_lng=start_lng,
         limit=limit,
         min_available=min_available,
-        prefer_ev=prefer_ev
+        prefer_ev=prefer_ev,
     )
+
 
 @app.get("/parking/map")
 def get_parking_map_data():
     return pathfinder.get_parking_lot_info()
 
+
 @app.post("/reservation", response_model=ReservationOut)
-def create_reservation(reservation: ReservationCreate, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def create_reservation(
+    reservation: ReservationCreate,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     if current_user["userID"] != reservation.userID:
-        raise HTTPException(status_code=403, detail="Not authorized to create reservations for other users")
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to create reservations for other users",
+        )
 
     cursor = db.cursor()
-    
+
     cursor.execute(
         """SELECT * FROM reservations 
            WHERE parkingLotID = ? 
            AND reservationStatus IN ('Pending', 'Completed') 
            AND NOT (endTime <= ? OR startTime >= ?)""",
-        (reservation.parkingLotID, reservation.startTime.isoformat(), reservation.endTime.isoformat())
+        (
+            reservation.parkingLotID,
+            reservation.startTime.isoformat(),
+            reservation.endTime.isoformat(),
+        ),
     )
     conflicting = cursor.fetchall()
-    
+
     if conflicting:
         raise HTTPException(status_code=400, detail="Time slot unavailable")
-    
+
     cursor.execute(
-        "SELECT capacity, reserved_slots FROM parking_lots WHERE parkingLotID = ?", 
-        (reservation.parkingLotID,)
+        "SELECT capacity, reserved_slots FROM parking_lots WHERE parkingLotID = ?",
+        (reservation.parkingLotID,),
     )
     lot = cursor.fetchone()
-    
+
     if not lot:
         raise HTTPException(status_code=404, detail="Parking lot not found")
-    
+
     if lot["reserved_slots"] >= lot["capacity"]:
         raise HTTPException(status_code=400, detail="Parking lot is full")
-    
-    duration_hours = (reservation.endTime - reservation.startTime).total_seconds() / 3600.0
+
+    duration_hours = (
+        reservation.endTime - reservation.startTime
+    ).total_seconds() / 3600.0
     price = round(2 * duration_hours, 2)
-    
+
     created_at = datetime.now().isoformat()
     cursor.execute(
         """INSERT INTO reservations 
@@ -555,26 +672,26 @@ def create_reservation(reservation: ReservationCreate, db: sqlite3.Connection = 
             price,
             "Completed",
             created_at,
-        )
+        ),
     )
     db.commit()
     reservation_id = cursor.lastrowid
-    
+
     cursor.execute(
         "UPDATE parking_lots SET reserved_slots = reserved_slots + 1 WHERE parkingLotID = ?",
-        (reservation.parkingLotID,)
+        (reservation.parkingLotID,),
     )
     db.commit()
-    
+
     payment_date = datetime.now().isoformat()
     cursor.execute(
         """INSERT INTO payments 
            (reservationID, amount, paymentMethod, paymentStatus, paymentDate) 
            VALUES (?, ?, ?, ?, ?)""",
-        (reservation_id, price, "CreditCard", "Completed", payment_date)
+        (reservation_id, price, "CreditCard", "Completed", payment_date),
     )
     db.commit()
-    
+
     return ReservationOut(
         reservationID=reservation_id,
         userID=reservation.userID,
@@ -582,60 +699,97 @@ def create_reservation(reservation: ReservationCreate, db: sqlite3.Connection = 
         startTime=reservation.startTime.isoformat(),
         endTime=reservation.endTime.isoformat(),
         price=price,
-        reservationStatus="Completed"
+        reservationStatus="Completed",
     )
 
+
 @app.get("/reservation/{reservation_id}", response_model=ReservationOut)
-def get_reservation(reservation_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_reservation(
+    reservation_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM reservations WHERE reservationID = ?", (reservation_id,))
+    cursor.execute(
+        "SELECT * FROM reservations WHERE reservationID = ?", (reservation_id,)
+    )
     res = cursor.fetchone()
 
     if res is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
 
     if res["userID"] != current_user["userID"]:
-        cursor.execute("SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],))
+        cursor.execute(
+            "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+        )
         admin = cursor.fetchone()
         if admin is None:
-            raise HTTPException(status_code=403, detail="Not authorized to view this reservation")
+            raise HTTPException(
+                status_code=403, detail="Not authorized to view this reservation"
+            )
 
     return ReservationOut(**dict(res))
 
+
 @app.get("/user/{user_id}/reservations", response_model=List[ReservationOut])
-def get_user_reservations(user_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_user_reservations(
+    user_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     if current_user["userID"] != user_id:
         cursor = db.cursor()
-        cursor.execute("SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],))
+        cursor.execute(
+            "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+        )
         admin = cursor.fetchone()
         if admin is None:
-            raise HTTPException(status_code=403, detail="Not authorized to view reservations for this user")
-    
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to view reservations for this user",
+            )
+
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM reservations WHERE userID = ? ORDER BY startTime DESC", (user_id,))
+    cursor.execute(
+        "SELECT * FROM reservations WHERE userID = ? ORDER BY startTime DESC",
+        (user_id,),
+    )
     reservations = cursor.fetchall()
-    
+
     return [ReservationOut(**dict(res)) for res in reservations]
 
+
 @app.delete("/reservation/{reservation_id}")
-def cancel_reservation(reservation_id: int, db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def cancel_reservation(
+    reservation_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM reservations WHERE reservationID = ?", (reservation_id,))
+    cursor.execute(
+        "SELECT * FROM reservations WHERE reservationID = ?", (reservation_id,)
+    )
     res = cursor.fetchone()
 
     if res is None or res["reservationStatus"] == "Cancelled":
-        raise HTTPException(status_code=400, detail="Cancellation failed: invalid reservation")
+        raise HTTPException(
+            status_code=400, detail="Cancellation failed: invalid reservation"
+        )
 
     if res["userID"] != current_user["userID"]:
-        cursor.execute("SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],))
+        cursor.execute(
+            "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+        )
         admin = cursor.fetchone()
         if admin is None:
-            raise HTTPException(status_code=403, detail="Not authorized to cancel this reservation")
+            raise HTTPException(
+                status_code=403, detail="Not authorized to cancel this reservation"
+            )
 
     cancellation_time = datetime.now()
     start_time = datetime.fromisoformat(res["startTime"])
     cancellation_deadline = start_time - timedelta(days=3)
-    
+
     if cancellation_time <= cancellation_deadline:
         refund_amount = res["price"]
         refund_message = "Cancellation confirmed with full refund"
@@ -645,32 +799,48 @@ def cancel_reservation(reservation_id: int, db: sqlite3.Connection = Depends(get
     else:
         refund_amount = 0
         refund_message = "Cancellation confirmed with no refund"
-    
-    cursor.execute("UPDATE reservations SET reservationStatus = ? WHERE reservationID = ?", ("Cancelled", reservation_id))
-    
-    cursor.execute("UPDATE parking_lots SET reserved_slots = reserved_slots - 1 WHERE parkingLotID = ?", (res["parkingLotID"],))
-    
+
+    cursor.execute(
+        "UPDATE reservations SET reservationStatus = ? WHERE reservationID = ?",
+        ("Cancelled", reservation_id),
+    )
+
+    cursor.execute(
+        "UPDATE parking_lots SET reserved_slots = reserved_slots - 1 WHERE parkingLotID = ?",
+        (res["parkingLotID"],),
+    )
+
     if refund_amount > 0:
         payment_date = datetime.now().isoformat()
         cursor.execute(
             "INSERT INTO payments (reservationID, amount, paymentMethod, paymentStatus, paymentDate) VALUES (?, ?, ?, ?, ?)",
-            (reservation_id, -refund_amount, "CreditCard", "Completed", payment_date)
+            (reservation_id, -refund_amount, "CreditCard", "Completed", payment_date),
         )
-    
+
     db.commit()
     return {"message": refund_message}
 
+
 @app.get("/admin/users", response_model=List[UserOut])
-def get_all_users(db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_admin)):
+def get_all_users(
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
+):
     cursor = db.cursor()
     cursor.execute("SELECT userID, userName, email, phone, userType FROM users")
     rows = cursor.fetchall()
     return [UserOut(**dict(row)) for row in rows]
 
+
 @app.get("/admin/parking-status")
-def get_parking_status(db: sqlite3.Connection = Depends(get_db), current_user: dict = Depends(get_current_admin)):
+def get_parking_status(
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
+):
     cursor = db.cursor()
-    cursor.execute("SELECT SUM(capacity) as total, SUM(reserved_slots) as reserved FROM parking_lots")
+    cursor.execute(
+        "SELECT SUM(capacity) as total, SUM(reserved_slots) as reserved FROM parking_lots"
+    )
     row = cursor.fetchone()
 
     total = row["total"] if row["total"] is not None else 0
@@ -678,6 +848,7 @@ def get_parking_status(db: sqlite3.Connection = Depends(get_db), current_user: d
     available = total - reserved
 
     return {"totalSlots": total, "reservedSlots": reserved, "availableSlots": available}
+
 
 # ---------------------- RUN APP ---------------------- #
 if __name__ == "__main__":
