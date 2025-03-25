@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
-export default function Navbar() {
+export function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
 
@@ -26,7 +26,6 @@ export default function Navbar() {
     setIsAdminMode(true)
   }
 
-  // Find the handleExitAdminClick function and update it to navigate to home
   const handleExitAdminClick = () => {
     setIsAdminMode(false)
     // Redirect to home page
