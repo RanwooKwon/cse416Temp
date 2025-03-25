@@ -58,7 +58,7 @@ def init_db():
                 email TEXT UNIQUE NOT NULL,
                 userName TEXT NOT NULL,
                 password TEXT NOT NULL,
-                userType TEXT CHECK (userType IN ('Faculty member', 'Non-resident student', 'Resident student', 'Visitor')),
+                userType TEXT DEFAULT 'Visitor' CHECK (userType IS NULL OR userType IN ('Faculty member', 'Non-resident student', 'Resident student', 'Visitor')),
                 sbuID INTEGER UNIQUE,
                 phone TEXT,
                 licenseInfo TEXT
@@ -137,12 +137,15 @@ class UserBase(BaseModel):
     email: EmailStr
     userName: str
     phone: Optional[str] = None
-    userType: str
+    userType: Optional[str] = "Visitor"
     sbuID: Optional[int] = None
     licenseInfo: Optional[str] = None
 
     @validator("userType")
     def validate_user_type(cls, v):
+        if v is None:
+            return "Visitor"
+            
         valid_types = [
             "Faculty member",
             "Non-resident student",
@@ -355,6 +358,8 @@ def login_for_access_token(
 def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
     hashed_password = get_password_hash(user.password)
+    
+    userType = user.userType if user.userType else "Visitor"
 
     try:
         cursor.execute(
@@ -364,22 +369,23 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
                 user.userName,
                 user.phone,
                 hashed_password,
-                user.userType,
+                userType,
                 user.sbuID,
                 user.licenseInfo,
             ),
         )
         db.commit()
         user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    except sqlite3.IntegrityError as e:
+        print(f"Registration error: {str(e)}")
+        raise HTTPException(status_code=400, detail="Email already registered or SBU ID already exists")
 
     return UserOut(
         userID=user_id,
         userName=user.userName,
         email=user.email,
         phone=user.phone,
-        userType=user.userType,
+        userType=userType,
     )
 
 
