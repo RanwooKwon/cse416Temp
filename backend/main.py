@@ -499,6 +499,30 @@ def get_parking_lots(db: sqlite3.Connection = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@app.get("/parking/campus/{campus}", response_model=List[ParkingLotOut])
+def get_parking_lots_by_campus(campus: str, db: sqlite3.Connection = Depends(get_db)):
+    try:
+        cursor = db.cursor()
+
+        search_pattern = f"%{campus}%"
+        cursor.execute(
+            "SELECT * FROM parking_lots WHERE location LIKE ?", (search_pattern,)
+        )
+        lots = cursor.fetchall()
+
+        if not lots:
+            print(f"Warning: No parking lots found for campus: {campus}")
+            return []
+
+        return [ParkingLotOut(**dict(lot)) for lot in lots]
+    except Exception as e:
+        import traceback
+
+        print(f"ERROR in get_parking_lots_by_campus: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
 @app.get("/parking/lots/{parking_lot_id}", response_model=ParkingLotOut)
 def get_parking_lot(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
