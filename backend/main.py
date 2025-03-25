@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, constr, validator, Field
 from typing import List, Optional, Union, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import sqlite3
 import uvicorn
 import json
@@ -41,7 +41,7 @@ def get_password_hash(password):
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (
+    expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
@@ -246,7 +246,7 @@ class NearestLotsRequest(BaseModel):
     )
 
 
-def get_current_user(
+async def get_current_user(
     token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)
 ):
     credentials_exception = HTTPException(
@@ -272,7 +272,7 @@ def get_current_user(
     return user
 
 
-def get_current_admin(
+async def get_current_admin(
     current_user: dict = Depends(get_current_user),
     db: sqlite3.Connection = Depends(get_db),
 ):
