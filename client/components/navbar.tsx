@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Car, Menu, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,14 +12,37 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { useRouter } from "next/navigation"
 
 export function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const router = useRouter()
+
+  // 페이지가 로드될 때마다 로그인 상태 확인
+  useEffect(() => {
+    checkLoginStatus()
+    // localStorage 변경 이벤트 리스너 추가
+    window.addEventListener('storage', checkLoginStatus)
+    return () => {
+      window.removeEventListener('storage', checkLoginStatus)
+    }
+  }, [])
+
+  const checkLoginStatus = () => {
+    const token = localStorage.getItem("token")
+    const storedUserId = localStorage.getItem("userId")
+    setIsLoggedIn(!!token)
+    setUserId(storedUserId)
+  }
 
   const handleLogout = () => {
+    localStorage.removeItem("token")
+    localStorage.removeItem("userId")
     setIsLoggedIn(false)
-    setIsAdminMode(false)
+    setUserId(null)
+    router.push("/login")
   }
 
   const handleAdminClick = () => {
@@ -28,11 +51,8 @@ export function Navbar() {
 
   const handleExitAdminClick = () => {
     setIsAdminMode(false)
-    // Redirect to home page
-    window.location.href = "/"
   }
 
-  // Update the NavItems component to only include Home and Make a Reservation
   const NavItems = () => (
     <>
       {!isAdminMode ? (
@@ -40,8 +60,17 @@ export function Navbar() {
           <Link href="/" className="text-sm font-medium hover:text-primary-foreground/80">
             Home
           </Link>
+          <Link href="/search" className="text-sm font-medium hover:text-primary-foreground/80">
+            Find Parking
+          </Link>
+          <Link href="/parking-status" className="text-sm font-medium hover:text-primary-foreground/80">
+            Live Status
+          </Link>
           <Link href="/reservations" className="text-sm font-medium hover:text-primary-foreground/80">
             Make a Reservation
+          </Link>
+          <Link href="/about" className="text-sm font-medium hover:text-primary-foreground/80">
+            About
           </Link>
         </>
       ) : null}
@@ -57,48 +86,35 @@ export function Navbar() {
         </Link>
         <div className="hidden md:flex items-center space-x-6">
           <NavItems />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-full bg-white text-primary hover:bg-white/90">
-                <User className="h-5 w-5" />
+          {isLoggedIn ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-full bg-white text-primary hover:bg-white/90">
+                  <User className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  <Link href="/profile" className="w-full">
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/reservations" className="w-full">
+                    Make a Reservation
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link href="/login">
+              <Button variant="outline" className="bg-white text-primary hover:bg-white/90">
+                Sign In
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {isLoggedIn ? (
-                <>
-                  <DropdownMenuItem>
-                    <Link href="/profile" className="w-full">
-                      Profile
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="/my-reservations" className="w-full">
-                      My Reservations
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem>
-                    <Link href="/login" className="w-full">
-                      Login
-                    </Link>
-                  </DropdownMenuItem>
-                  {isAdminMode ? (
-                    <DropdownMenuItem onClick={handleExitAdminClick}>Exit Admin Mode</DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem onClick={handleAdminClick}>
-                      <Link href="/admin" className="w-full" onClick={handleAdminClick}>
-                        Admin
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </Link>
+          )}
         </div>
         <div className="md:hidden">
           <Sheet>
@@ -117,9 +133,9 @@ export function Navbar() {
                         Profile
                       </Button>
                     </Link>
-                    <Link href="/my-reservations">
+                    <Link href="/reservations">
                       <Button variant="outline" className="w-full">
-                        My Reservations
+                        Make a Reservation
                       </Button>
                     </Link>
                     <Button onClick={handleLogout} className="w-full">
@@ -127,22 +143,16 @@ export function Navbar() {
                     </Button>
                   </>
                 ) : (
-                  <>
-                    <Link href="/login">
-                      <Button className="w-full">Login</Button>
-                    </Link>
-                    {isAdminMode ? (
-                      <Button variant="outline" className="w-full" onClick={handleExitAdminClick}>
-                        Exit Admin Mode
-                      </Button>
-                    ) : (
-                      <Link href="/admin" onClick={handleAdminClick}>
-                        <Button variant="outline" className="w-full">
-                          Admin
-                        </Button>
-                      </Link>
-                    )}
-                  </>
+                  <Link href="/login">
+                    <Button className="w-full">Sign In</Button>
+                  </Link>
+                )}
+                {!isLoggedIn && (
+                  <Link href="/admin" onClick={handleAdminClick}>
+                    <Button variant="outline" className="w-full">
+                      Admin
+                    </Button>
+                  </Link>
                 )}
               </div>
             </SheetContent>
@@ -152,4 +162,6 @@ export function Navbar() {
     </nav>
   )
 }
+
+export default Navbar
 

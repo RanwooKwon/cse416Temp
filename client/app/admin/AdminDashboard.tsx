@@ -13,10 +13,22 @@ export default function AdminDashboard() {
       buttonText: "Manage Users",
     },
     {
+      title: "Parking Lot Management",
+      description: "Manage parking lots and rates",
+      link: "/admin/parking-lots",
+      buttonText: "Manage Parking Lots",
+    },
+    {
       title: "User Feedback",
       description: "Review and respond to user comments",
       link: "/admin/feedback",
       buttonText: "Manage Feedback",
+    },
+    {
+      title: "Data Analysis",
+      description: "View and analyze parking data",
+      link: "/admin/data-analysis",
+      buttonText: "View Analytics",
     },
   ]
 

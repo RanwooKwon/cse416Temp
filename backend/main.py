@@ -293,7 +293,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -388,6 +388,7 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
         userType=userType,
     )
 
+@app.post("/user/login", response_model=Token)
 
 @app.post("/user/login")
 def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):

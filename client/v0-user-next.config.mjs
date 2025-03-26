@@ -21,6 +21,15 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  async rewrites() {
+    console.log('Rewriting request to backend...')
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8000/:path*',
+      },
+    ]
+  },
 }
 
 mergeConfig(nextConfig, userConfig)
@@ -46,3 +55,4 @@ function mergeConfig(nextConfig, userConfig) {
 }
 
 export default nextConfig
+
