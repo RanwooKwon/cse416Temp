@@ -1,124 +1,91 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
-// This would typically come from your API or auth context
-const mockUserData = {
-  id: "12345",
-  firstName: "John",
-  lastName: "Doe",
-  sbuId: "123456789",
-  driverLicense: "NY1234567",
-  vehicleId: "ABC-1234",
-  address: "123 Campus Drive, Stony Brook, NY 11790",
+interface UserProfile {
+  userId: number
+  userName: string
+  email: string
+  phone: string
+  userType: string
 }
 
 export default function ProfileForm() {
-  const [isEditing, setIsEditing] = useState(false)
-  const [userData, setUserData] = useState(mockUserData)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setUserData((prev) => ({ ...prev, [name]: value }))
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const userId = localStorage.getItem("userId")
+        if (!userId) {
+          throw new Error("User ID not found")
+        }
+
+        const token = localStorage.getItem("token")
+        const response = await fetch(`http://localhost:8000/user/${userId}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch profile")
+        }
+
+        const data = await response.json()
+        setProfile(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load profile")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProfile()
+  }, [])
+
+  if (isLoading) {
+    return <div>Loading...</div>
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Here you would typically send the updated data to your API
-    console.log("Updated user data:", userData)
-    setIsEditing(false)
+  if (error) {
+    return <div>Error: {error}</div>
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card>
       <CardHeader>
-        <CardTitle>User Profile</CardTitle>
-        <CardDescription>View and edit your profile information</CardDescription>
+        <CardTitle>Profile Information</CardTitle>
+        <CardDescription>Your personal information</CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="id">User ID (Read-only)</Label>
-            <Input id="id" value={userData.id} readOnly disabled />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                name="firstName"
-                value={userData.firstName}
-                onChange={handleInputChange}
-                readOnly={!isEditing}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                value={userData.lastName}
-                onChange={handleInputChange}
-                readOnly={!isEditing}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sbuId">SBU ID</Label>
-            <Input id="sbuId" name="sbuId" value={userData.sbuId} onChange={handleInputChange} readOnly={!isEditing} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="driverLicense">Driver License Information</Label>
-            <Input
-              id="driverLicense"
-              name="driverLicense"
-              value={userData.driverLicense}
-              onChange={handleInputChange}
-              readOnly={!isEditing}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="vehicleId">Vehicle ID (Plate Number)</Label>
-            <Input
-              id="vehicleId"
-              name="vehicleId"
-              value={userData.vehicleId}
-              onChange={handleInputChange}
-              readOnly={!isEditing}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              name="address"
-              value={userData.address}
-              onChange={handleInputChange}
-              readOnly={!isEditing}
-            />
-          </div>
-        </form>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Name</Label>
+          <Input 
+            value={profile?.userName || ""} 
+            readOnly 
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Email</Label>
+          <Input 
+            value={profile?.email || ""} 
+            readOnly 
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>User Category</Label>
+          <Input 
+            value={profile?.userType || ""} 
+            readOnly 
+          />
+        </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        {isEditing ? (
-          <>
-            <Button type="submit" onClick={handleSubmit}>
-              Save Changes
-            </Button>
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
-        )}
-      </CardFooter>
     </Card>
   )
 }

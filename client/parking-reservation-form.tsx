@@ -18,6 +18,7 @@ export default function ParkingReservationForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // Here you would typically send the form data to your backend
     console.log({ startDate, duration, slots, justification })
     alert("Reservation submitted successfully!")
   }

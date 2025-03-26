@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -18,7 +18,7 @@ interface Feedback {
   status: "Unread" | "Read" | "Responded"
 }
 
-export default function FeedbackManagementPage() {
+export default function AdminFeedback() {
   const [feedback, setFeedback] = useState<Feedback[]>([
     {
       id: 1,

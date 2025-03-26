@@ -2,7 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { Navbar } from "@/components/navbar" // Updated to use named import
+import { Navbar } from "@/components/navbar"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -26,6 +27,7 @@ export default function RootLayout({
           <footer className="bg-primary text-primary-foreground py-4">
             <div className="container text-center">© 2024 SBU Parking. All rights reserved.</div>
           </footer>
+          <Toaster />
         </div>
       </body>
     </html>

@@ -3,85 +3,126 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function LoginForm() {
-  const [loginMethod, setLoginMethod] = useState<"email" | "google">("email")
   const [email, setEmail] = useState("")
-  const [verificationCode, setVerificationCode] = useState("")
-  const [isCodeSent, setIsCodeSent] = useState(false)
+  const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleEmailLogin = (e: React.FormEvent) => {
+  const router = useRouter()
+  const { toast } = useToast()
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Here you would send the verification code to the email
-    setIsCodeSent(true)
-  }
+    setIsLoading(true)
 
-  const handleGoogleLogin = () => {
-    // Here you would implement Google login logic
-    setLoginMethod("google")
-    setIsCodeSent(true)
-  }
+    if (!email || !password) {
+      toast({
+        title: "input error",
+        description: "email and password required.",
+        variant: "destructive",
+      })
+      setIsLoading(false)
+      return
+    }
 
-  const handleVerifyCode = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Here you would verify the code and log the user in
-    console.log("Verifying code:", verificationCode)
+    try {
+      const response = await fetch("http://localhost:8000/user/login", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Invalid credentials")
+      }
+
+      const data = await response.json()
+      
+      localStorage.setItem("token", data.access_token)
+      localStorage.setItem("userId", data.userId.toString())
+      
+      window.dispatchEvent(new Event('storage'))
+
+      toast({
+        title: "Login successful",
+        description: "Welcome back!",
+      })
+
+      router.push("/")
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: error instanceof Error ? error.message : "Invalid email or password",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Sign In</CardTitle>
-        <CardDescription>Choose your sign in method</CardDescription>
+        <CardDescription>Enter your credentials to access your account</CardDescription>
       </CardHeader>
       <CardContent>
-        {!isCodeSent ? (
-          <>
-            <form onSubmit={handleEmailLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">SBU Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your.name@stonybrook.edu"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                Sign in with SBU Email
-              </Button>
-            </form>
-            <div className="mt-4">
-              <Button onClick={handleGoogleLogin} variant="outline" className="w-full">
-                Sign in with Google
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="your.name@stonybrook.edu"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Button variant="link" className="p-0 h-auto text-xs" onClick={() => router.push("/login?tab=reset")}>
+                Forgot password?
               </Button>
             </div>
-          </>
-        ) : (
-          <form onSubmit={handleVerifyCode} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="code">Verification Code</Label>
-              <Input
-                id="code"
-                type="text"
-                placeholder="Enter 6-digit code"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full">
-              Verify Code
-            </Button>
-          </form>
-        )}
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Signing in..." : "Sign in"}
+          </Button>
+        </form>
       </CardContent>
+      <CardFooter className="flex justify-center">
+        <p className="text-sm text-muted-foreground">
+          Don't have an account?{" "}
+          <Button variant="link" className="p-0 h-auto" onClick={() => router.push("/login?tab=register")}>
+            Sign up
+          </Button>
+        </p>
+      </CardFooter>
     </Card>
   )
 }
