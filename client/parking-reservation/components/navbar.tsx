@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Car, Menu, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,14 +13,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { toast } from "sonner"
+import { isAuthenticated, logout } from "@/lib/auth"
 
-export function Navbar() {
+export default function Navbar() {
+  const router = useRouter()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isAdminMode, setIsAdminMode] = useState(false)
 
+  useEffect(() => {
+    // Check if user is logged in
+    setIsLoggedIn(isAuthenticated())
+  }, [])
+
   const handleLogout = () => {
+    logout()
     setIsLoggedIn(false)
     setIsAdminMode(false)
+    toast.success("Successfully logged out!")
+    router.push("/")
   }
 
   const handleAdminClick = () => {
@@ -28,11 +40,8 @@ export function Navbar() {
 
   const handleExitAdminClick = () => {
     setIsAdminMode(false)
-    // Redirect to home page
-    window.location.href = "/"
   }
 
-  // Update the NavItems component to only include Home and Make a Reservation
   const NavItems = () => (
     <>
       {!isAdminMode ? (
@@ -40,8 +49,17 @@ export function Navbar() {
           <Link href="/" className="text-sm font-medium hover:text-primary-foreground/80">
             Home
           </Link>
+          <Link href="/search" className="text-sm font-medium hover:text-primary-foreground/80">
+            Find Parking
+          </Link>
+          <Link href="/parking-status" className="text-sm font-medium hover:text-primary-foreground/80">
+            Live Status
+          </Link>
           <Link href="/reservations" className="text-sm font-medium hover:text-primary-foreground/80">
             Make a Reservation
+          </Link>
+          <Link href="/about" className="text-sm font-medium hover:text-primary-foreground/80">
+            About
           </Link>
         </>
       ) : null}
