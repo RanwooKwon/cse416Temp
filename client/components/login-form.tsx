@@ -22,11 +22,10 @@ export default function LoginForm() {
     e.preventDefault()
     setIsLoading(true)
 
-    // 간단한 검증
     if (!email || !password) {
       toast({
-        title: "입력 오류",
-        description: "이메일과 비밀번호를 모두 입력해주세요.",
+        title: "input error",
+        description: "email and password required.",
         variant: "destructive",
       })
       setIsLoading(false)
@@ -52,11 +51,9 @@ export default function LoginForm() {
 
       const data = await response.json()
       
-      // 토큰 저장
       localStorage.setItem("token", data.access_token)
       localStorage.setItem("userId", data.userId.toString())
       
-      // localStorage 이벤트 트리거
       window.dispatchEvent(new Event('storage'))
 
       toast({
