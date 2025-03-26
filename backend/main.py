@@ -157,8 +157,14 @@ class UserBase(BaseModel):
         return v
 
 
-class UserRegister(UserBase):
-    password: constr(min_length=12)
+class UserRegister(BaseModel):
+    email: str
+    userName: str
+    password: str
+    userType: str = None
+    phone: str = None
+    sbuID: str = None
+    licenseInfo: str = None
 
 
 class UserOut(BaseModel):
@@ -358,8 +364,13 @@ def login_for_access_token(
 def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
     hashed_password = get_password_hash(user.password)
-    
-    userType = user.userType if user.userType else "Visitor"
+    print('got here')
+    userType = user.userType if hasattr(user, 'userType') and user.userType else "Visitor"
+    phone = user.phone if hasattr(user, 'phone') and user.phone else None
+    sbuID = user.sbuID if hasattr(user, 'sbuID') and user.sbuID else None
+    licenseInfo = user.licenseInfo if hasattr(user, 'licenseInfo') and user.licenseInfo else None
+
+    print(userType, phone, sbuID, licenseInfo)
 
     try:
         cursor.execute(
@@ -367,11 +378,11 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
             (
                 user.email,
                 user.userName,
-                user.phone,
+                phone,
                 hashed_password,
                 userType,
-                user.sbuID,
-                user.licenseInfo,
+                sbuID,
+                licenseInfo,
             ),
         )
         db.commit()
@@ -384,7 +395,7 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
         userID=user_id,
         userName=user.userName,
         email=user.email,
-        phone=user.phone,
+        phone=phone,
         userType=userType,
     )
 
@@ -412,18 +423,18 @@ def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):
 def get_user(
     user_id: int,
     db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    # current_user: dict = Depends(get_current_user),
 ):
-    if current_user["userID"] != user_id:
-        admin_cursor = db.cursor()
-        admin_cursor.execute(
-            "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
-        )
-        admin = admin_cursor.fetchone()
-        if admin is None:
-            raise HTTPException(
-                status_code=403, detail="Not authorized to view this user's information"
-            )
+    # if current_user["userID"] != user_id:
+    #     admin_cursor = db.cursor()
+    #     admin_cursor.execute(
+    #         "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+    #     )
+    #     admin = admin_cursor.fetchone()
+    #     if admin is None:
+    #         raise HTTPException(
+    #             status_code=403, detail="Not authorized to view this user's information"
+    #         )
 
     cursor = db.cursor()
     cursor.execute(
