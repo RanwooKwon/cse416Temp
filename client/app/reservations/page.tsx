@@ -82,7 +82,7 @@ export default function ReservationsPage() {
       setIsLoadingCampuses(true);
       setError(null);
       try {
-        const response = await fetch("http://0.0.0.0:8000/parking/campus/list");
+        const response = await fetch("http://127.0.0.1:8000/parking/campus/list");
         if (!response.ok) throw new Error("Failed to fetch campuses");
         const data = await response.json();
         setCampuses(data);
@@ -105,7 +105,7 @@ export default function ReservationsPage() {
       setError(null);
       try {
         const response = await fetch(
-          `http://0.0.0.0:8000/parking/campus/${encodeURIComponent(
+          `http://127.0.0.1:8000/parking/campus/${encodeURIComponent(
             selectedCampus
           )}`
         );
