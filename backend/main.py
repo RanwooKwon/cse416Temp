@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +11,11 @@ import json
 import jwt
 from passlib.context import CryptContext
 import pathfinder
+import forecasting
+from db_manager import get_db_connection, execute_query, execute_write_query
+import asyncio
+import os
+from contextlib import asynccontextmanager
 
 DATABASE = "parking.db"
 SECRET_KEY = "SECRET"
@@ -19,6 +24,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    forecasting.load_forecasting_models()
+    yield
+    forecasting.save_forecasting_models()
 
 
 # ---------------------- DATABASE SETUP ---------------------- #
@@ -42,7 +54,7 @@ def get_password_hash(password):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -145,7 +157,7 @@ class UserBase(BaseModel):
     def validate_user_type(cls, v):
         if v is None:
             return "Visitor"
-            
+
         valid_types = [
             "Faculty member",
             "Non-resident student",
@@ -256,7 +268,7 @@ class NearestLotsRequest(BaseModel):
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)
+        token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)
 ):
     credentials_exception = HTTPException(
         status_code=401,
@@ -282,8 +294,8 @@ async def get_current_user(
 
 
 async def get_current_admin(
-    current_user: dict = Depends(get_current_user),
-    db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_user),
+        db: sqlite3.Connection = Depends(get_db),
 ):
     cursor = db.cursor()
     cursor.execute(
@@ -295,7 +307,7 @@ async def get_current_admin(
     return current_user
 
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -304,6 +316,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------- NEW PYDANTIC MODELS ---------------------- #
+class ForecastRequest(BaseModel):
+    parkingLotID: int
+    hours_ahead: Optional[int] = 12
+
+
+class BestTimeRequest(BaseModel):
+    parkingLotID: int
+    time_window_hours: Optional[int] = 24
 
 
 @app.on_event("startup")
@@ -333,8 +356,8 @@ async def favicon():
 
 @app.post("/token", response_model=Token)
 def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: sqlite3.Connection = Depends(get_db),
+        form_data: OAuth2PasswordRequestForm = Depends(),
+        db: sqlite3.Connection = Depends(get_db),
 ):
     cursor = db.cursor()
     cursor.execute("SELECT * FROM users WHERE email = ?", (form_data.username,))
@@ -399,8 +422,8 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
         userType=userType,
     )
 
-@app.post("/user/login", response_model=Token)
 
+@app.post("/user/login", response_model=Token)
 @app.post("/user/login")
 def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
@@ -421,9 +444,9 @@ def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):
 
 @app.get("/user/{user_id}", response_model=UserOut)
 def get_user(
-    user_id: int,
-    db: sqlite3.Connection = Depends(get_db),
-    # current_user: dict = Depends(get_current_user),
+        user_id: int,
+        db: sqlite3.Connection = Depends(get_db),
+        # current_user: dict = Depends(get_current_user),
 ):
     # if current_user["userID"] != user_id:
     #     admin_cursor = db.cursor()
@@ -451,10 +474,10 @@ def get_user(
 
 @app.post("/user/{user_id}/cars", response_model=CarOut)
 def add_car(
-    user_id: int,
-    car: CarCreate,
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+        user_id: int,
+        car: CarCreate,
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_user),
 ):
     if current_user["userID"] != user_id:
         raise HTTPException(
@@ -481,9 +504,9 @@ def add_car(
 
 @app.get("/user/{user_id}/cars", response_model=List[CarOut])
 def get_cars(
-    user_id: int,
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+        user_id: int,
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_user),
 ):
     if current_user["userID"] != user_id:
         raise HTTPException(
@@ -521,9 +544,10 @@ def get_parking_lots(db: sqlite3.Connection = Depends(get_db)):
 def get_campus_list(db: sqlite3.Connection = Depends(get_db)):
     try:
         cursor = db.cursor()
-        cursor.execute("SELECT DISTINCT substr(location, instr(location, ', ') + 2) AS campus FROM parking_lots ORDER BY campus")
+        cursor.execute(
+            "SELECT DISTINCT substr(location, instr(location, ', ') + 2) AS campus FROM parking_lots ORDER BY campus")
         results = cursor.fetchall()
-        
+
         campuses = [row["campus"] for row in results if row["campus"]]
         return campuses
     except Exception as e:
@@ -573,9 +597,9 @@ def get_parking_lot(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db
 
 @app.post("/parking/lots", response_model=ParkingLotOut)
 def create_parking_lot(
-    parking_lot: ParkingLotCreate,
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_admin),
+        parking_lot: ParkingLotCreate,
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_admin),
 ):
     cursor = db.cursor()
     cursor.execute(
@@ -650,11 +674,12 @@ def find_nearest_lots_post(request: NearestLotsRequest):
 
 @app.get("/parking/nearest")
 def find_nearest_lots_get(
-    start_lat: float,
-    start_lng: float,
-    limit: Optional[int] = 5,
-    min_available: Optional[int] = 1,
-    prefer_ev: Optional[bool] = False,
+        start_lat: float,
+        start_lng: float,
+        limit: Optional[int] = 5,
+        min_available: Optional[int] = 1,
+        prefer_ev: Optional[bool] = False,
+        max_distance: Optional[float] = None,
 ):
     return pathfinder.find_nearest_available_lots(
         start_lat=start_lat,
@@ -662,6 +687,7 @@ def find_nearest_lots_get(
         limit=limit,
         min_available=min_available,
         prefer_ev=prefer_ev,
+        max_distance=max_distance,
     )
 
 
@@ -670,102 +696,96 @@ def get_parking_map_data():
     return pathfinder.get_parking_lot_info()
 
 
+@app.get("/parking/forecast/{parking_lot_id}")
+def get_parking_forecast(parking_lot_id: int, hours_ahead: Optional[int] = 12):
+    """Get parking lot occupancy forecast for the specified hours ahead."""
+    try:
+        forecast_data = forecasting.get_parking_lot_forecast(
+            lot_id=parking_lot_id,
+            hours_ahead=min(24, max(1, hours_ahead))  # Limit to 1-24 hours
+        )
+        return {"forecast": forecast_data}
+    except Exception as e:
+        import traceback
+        print(f"Error in get_parking_forecast: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/parking/forecast")
+def get_parking_forecast_post(request: ForecastRequest):
+    """Get parking lot occupancy forecast for the specified hours ahead (POST endpoint)."""
+    return get_parking_forecast(
+        parking_lot_id=request.parkingLotID,
+        hours_ahead=request.hours_ahead
+    )
+
+
+@app.get("/parking/best-time/{parking_lot_id}")
+def get_best_parking_time(parking_lot_id: int, time_window_hours: Optional[int] = 24):
+    """Find the best time to park in the given time window."""
+    try:
+        best_time = forecasting.get_best_parking_time(
+            lot_id=parking_lot_id,
+            time_window_hours=min(48, max(3, time_window_hours))  # Limit to 3-48 hours
+        )
+        return best_time
+    except Exception as e:
+        import traceback
+        print(f"Error in get_best_parking_time: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/parking/best-time")
+def get_best_parking_time_post(request: BestTimeRequest):
+    """Find the best time to park in the given time window (POST endpoint)."""
+    return get_best_parking_time(
+        parking_lot_id=request.parkingLotID,
+        time_window_hours=request.time_window_hours
+    )
+
+
 @app.post("/reservation", response_model=ReservationOut)
-def create_reservation(
-    reservation: ReservationCreate,
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+async def create_reservation(
+        reservation: ReservationCreate,
+        current_user: dict = Depends(get_current_user),
 ):
+    """
+    Create a new parking reservation with optimized handling for concurrent requests.
+    Uses optimistic concurrency control with retry logic for better performance under load.
+    """
     if current_user["userID"] != reservation.userID:
         raise HTTPException(
             status_code=403,
             detail="Not authorized to create reservations for other users",
         )
-
-    cursor = db.cursor()
-
-    cursor.execute(
-        """SELECT * FROM reservations 
-           WHERE parkingLotID = ? 
-           AND reservationStatus IN ('Pending', 'Completed') 
-           AND NOT (endTime <= ? OR startTime >= ?)""",
-        (
-            reservation.parkingLotID,
-            reservation.startTime.isoformat(),
-            reservation.endTime.isoformat(),
-        ),
+    
+    import reservation_handler
+    
+    result = reservation_handler.create_reservation(
+        user_id=reservation.userID,
+        parking_lot_id=reservation.parkingLotID,
+        start_time=reservation.startTime,
+        end_time=reservation.endTime
     )
-    conflicting = cursor.fetchall()
-
-    if conflicting:
-        raise HTTPException(status_code=400, detail="Time slot unavailable")
-
-    cursor.execute(
-        "SELECT capacity, reserved_slots FROM parking_lots WHERE parkingLotID = ?",
-        (reservation.parkingLotID,),
-    )
-    lot = cursor.fetchone()
-
-    if not lot:
-        raise HTTPException(status_code=404, detail="Parking lot not found")
-
-    if lot["reserved_slots"] >= lot["capacity"]:
-        raise HTTPException(status_code=400, detail="Parking lot is full")
-
-    duration_hours = (
-        reservation.endTime - reservation.startTime
-    ).total_seconds() / 3600.0
-    price = round(2 * duration_hours, 2)
-
-    created_at = datetime.now().isoformat()
-    cursor.execute(
-        """INSERT INTO reservations 
-           (userID, parkingLotID, startTime, endTime, price, reservationStatus, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (
-            reservation.userID,
-            reservation.parkingLotID,
-            reservation.startTime.isoformat(),
-            reservation.endTime.isoformat(),
-            price,
-            "Completed",
-            created_at,
-        ),
-    )
-    db.commit()
-    reservation_id = cursor.lastrowid
-
-    cursor.execute(
-        "UPDATE parking_lots SET reserved_slots = reserved_slots + 1 WHERE parkingLotID = ?",
-        (reservation.parkingLotID,),
-    )
-    db.commit()
-
-    payment_date = datetime.now().isoformat()
-    cursor.execute(
-        """INSERT INTO payments 
-           (reservationID, amount, paymentMethod, paymentStatus, paymentDate) 
-           VALUES (?, ?, ?, ?, ?)""",
-        (reservation_id, price, "CreditCard", "Completed", payment_date),
-    )
-    db.commit()
-
+    
     return ReservationOut(
-        reservationID=reservation_id,
-        userID=reservation.userID,
-        parkingLotID=reservation.parkingLotID,
-        startTime=reservation.startTime.isoformat(),
-        endTime=reservation.endTime.isoformat(),
-        price=price,
-        reservationStatus="Completed",
+        reservationID=result["reservationID"],
+        userID=result["userID"],
+        parkingLotID=result["parkingLotID"],
+        startTime=result["startTime"],
+        endTime=result["endTime"],
+        price=result["price"],
+        reservationStatus=result["reservationStatus"],
     )
 
 
 @app.get("/reservation/{reservation_id}", response_model=ReservationOut)
 def get_reservation(
-    reservation_id: int,
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+        reservation_id: int,
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_user),
 ):
     cursor = db.cursor()
     cursor.execute(
@@ -791,9 +811,9 @@ def get_reservation(
 
 @app.get("/user/{user_id}/reservations", response_model=List[ReservationOut])
 def get_user_reservations(
-    user_id: int,
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+        user_id: int,
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_user),
 ):
     if current_user["userID"] != user_id:
         cursor = db.cursor()
@@ -819,70 +839,34 @@ def get_user_reservations(
 
 @app.delete("/reservation/{reservation_id}")
 def cancel_reservation(
-    reservation_id: int,
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+        reservation_id: int,
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_user),
 ):
     cursor = db.cursor()
+    is_admin = False
+    
     cursor.execute(
-        "SELECT * FROM reservations WHERE reservationID = ?", (reservation_id,)
+        "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
     )
-    res = cursor.fetchone()
-
-    if res is None or res["reservationStatus"] == "Cancelled":
-        raise HTTPException(
-            status_code=400, detail="Cancellation failed: invalid reservation"
-        )
-
-    if res["userID"] != current_user["userID"]:
-        cursor.execute(
-            "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
-        )
-        admin = cursor.fetchone()
-        if admin is None:
-            raise HTTPException(
-                status_code=403, detail="Not authorized to cancel this reservation"
-            )
-
-    cancellation_time = datetime.now()
-    start_time = datetime.fromisoformat(res["startTime"])
-    cancellation_deadline = start_time - timedelta(days=3)
-
-    if cancellation_time <= cancellation_deadline:
-        refund_amount = res["price"]
-        refund_message = "Cancellation confirmed with full refund"
-    elif cancellation_time <= start_time:
-        refund_amount = res["price"] * 0.5
-        refund_message = "Cancellation confirmed with partial refund"
-    else:
-        refund_amount = 0
-        refund_message = "Cancellation confirmed with no refund"
-
-    cursor.execute(
-        "UPDATE reservations SET reservationStatus = ? WHERE reservationID = ?",
-        ("Cancelled", reservation_id),
+    admin = cursor.fetchone()
+    if admin is not None:
+        is_admin = True
+    
+    import reservation_handler
+    result = reservation_handler.cancel_reservation(
+        reservation_id=reservation_id,
+        user_id=current_user["userID"],
+        is_admin=is_admin
     )
-
-    cursor.execute(
-        "UPDATE parking_lots SET reserved_slots = reserved_slots - 1 WHERE parkingLotID = ?",
-        (res["parkingLotID"],),
-    )
-
-    if refund_amount > 0:
-        payment_date = datetime.now().isoformat()
-        cursor.execute(
-            "INSERT INTO payments (reservationID, amount, paymentMethod, paymentStatus, paymentDate) VALUES (?, ?, ?, ?, ?)",
-            (reservation_id, -refund_amount, "CreditCard", "Completed", payment_date),
-        )
-
-    db.commit()
-    return {"message": refund_message}
+    
+    return result
 
 
 @app.get("/admin/users", response_model=List[UserOut])
 def get_all_users(
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_admin),
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_admin),
 ):
     cursor = db.cursor()
     cursor.execute("SELECT userID, userName, email, phone, userType FROM users")
@@ -892,8 +876,8 @@ def get_all_users(
 
 @app.get("/admin/parking-status")
 def get_parking_status(
-    db: sqlite3.Connection = Depends(get_db),
-    current_user: dict = Depends(get_current_admin),
+        db: sqlite3.Connection = Depends(get_db),
+        current_user: dict = Depends(get_current_admin),
 ):
     cursor = db.cursor()
     cursor.execute(
