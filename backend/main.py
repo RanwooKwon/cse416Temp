@@ -329,6 +329,18 @@ class BestTimeRequest(BaseModel):
     time_window_hours: Optional[int] = 24
 
 
+class LiveStatusResponse(BaseModel):
+    parkingLotID: int
+    name: str
+    location: str
+    totalSpots: int
+    occupiedSpots: int
+    availableSpots: int
+    occupancyPercentage: float
+    status: str
+    lastUpdated: str
+
+
 @app.on_event("startup")
 def on_startup():
     init_db()
@@ -343,6 +355,7 @@ def read_root():
             "auth": "/token",
             "users": "/user/*",
             "parking": "/parking/*",
+            "parking_live_status": "/parking/live-status",
             "reservations": "/reservation/*",
             "admin": "/admin/*",
         },
@@ -744,6 +757,97 @@ def get_best_parking_time_post(request: BestTimeRequest):
         parking_lot_id=request.parkingLotID,
         time_window_hours=request.time_window_hours
     )
+
+
+@app.get("/parking/live-status", response_model=List[LiveStatusResponse])
+def get_all_live_status(db: sqlite3.Connection = Depends(get_db)):
+    try:
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT p.parkingLotID, p.name, p.location, p.capacity, p.reserved_slots
+            FROM parking_lots p
+            ORDER BY p.parkingLotID
+        """)
+        lots = cursor.fetchall()
+        
+        current_time = datetime.now().isoformat()
+        result = []
+        
+        for lot in lots:
+            capacity = lot["capacity"]
+            reserved = lot["reserved_slots"]
+            available = capacity - reserved
+            occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
+            
+            status = "Available"
+            if occupancy_percentage > 80:
+                status = "Busy"
+            elif occupancy_percentage > 50:
+                status = "Moderate"
+            
+            result.append(LiveStatusResponse(
+                parkingLotID=lot["parkingLotID"],
+                name=lot["name"],
+                location=lot["location"],
+                totalSpots=capacity,
+                occupiedSpots=reserved,
+                availableSpots=available,
+                occupancyPercentage=round(occupancy_percentage, 1),
+                status=status,
+                lastUpdated=current_time
+            ))
+        
+        return result
+    except Exception as e:
+        import traceback
+        print(f"Error in get_all_live_status: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/parking/live-status/{parking_lot_id}", response_model=LiveStatusResponse)
+def get_parking_lot_live_status(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db)):
+    try:
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT p.parkingLotID, p.name, p.location, p.capacity, p.reserved_slots
+            FROM parking_lots p
+            WHERE p.parkingLotID = ?
+        """, (parking_lot_id,))
+        lot = cursor.fetchone()
+        
+        if not lot:
+            raise HTTPException(status_code=404, detail="Parking lot not found")
+        
+        capacity = lot["capacity"]
+        reserved = lot["reserved_slots"]
+        available = capacity - reserved
+        occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
+        
+        status = "Available"
+        if occupancy_percentage > 80:
+            status = "Busy"
+        elif occupancy_percentage > 50:
+            status = "Moderate"
+        
+        current_time = datetime.now().isoformat()
+        
+        return LiveStatusResponse(
+            parkingLotID=lot["parkingLotID"],
+            name=lot["name"],
+            location=lot["location"],
+            totalSpots=capacity,
+            occupiedSpots=reserved,
+            availableSpots=available,
+            occupancyPercentage=round(occupancy_percentage, 1),
+            status=status,
+            lastUpdated=current_time
+        )
+    except Exception as e:
+        import traceback
+        print(f"Error in get_parking_lot_live_status: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/reservation", response_model=ReservationOut)
