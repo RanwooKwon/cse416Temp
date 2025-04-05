@@ -176,3 +176,7 @@ cython_debug/
 performance_test_*.csv
 
 backend/models/arima_models.pkl
+
+backend/parking.db-shm
+
+backend/parking.db-wal
