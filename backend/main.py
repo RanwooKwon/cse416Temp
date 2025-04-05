@@ -373,6 +373,12 @@ def read_root():
             "parking": "/parking/*",
             "parking_live_status": "/parking/live-status",
             "parking_live_status_campus": "/parking/live-status/campus/{campus}",
+            "parking_forecast": "/parking/forecast/{parking_lot_id}",
+            "parking_best_time": "/parking/best-time/{parking_lot_id}",
+            "parking_daily_pattern": "/parking/daily-pattern/{parking_lot_id}",
+            "parking_weekly_pattern": "/parking/weekly-pattern/{parking_lot_id}", 
+            "parking_time_breakdown": "/parking/time-breakdown/{parking_lot_id}",
+            "parking_toggle_random": "/parking/toggle-random-mode",
             "reservations": "/reservation/*",
             "admin": "/admin/*",
         },
@@ -782,6 +788,54 @@ def get_best_parking_time_post(request: BestTimeRequest):
     return get_best_parking_time(
         parking_lot_id=request.parkingLotID, time_window_hours=request.time_window_hours
     )
+
+
+@app.get("/parking/daily-pattern/{parking_lot_id}")
+def get_daily_occupancy_pattern(parking_lot_id: int, day: Optional[int] = None):
+    try:
+        result = forecasting.get_daily_pattern(lot_id=parking_lot_id, day_of_week=day)
+        return result
+    except Exception as e:
+        import traceback
+        print(f"Error in get_daily_occupancy_pattern: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/parking/weekly-pattern/{parking_lot_id}")
+def get_weekly_occupancy_pattern(parking_lot_id: int):
+    try:
+        result = forecasting.get_weekly_pattern(lot_id=parking_lot_id)
+        return result
+    except Exception as e:
+        import traceback
+        print(f"Error in get_weekly_occupancy_pattern: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/parking/time-breakdown/{parking_lot_id}")
+def get_occupancy_time_breakdown(parking_lot_id: int, day: Optional[int] = None):
+    try:
+        result = forecasting.get_time_breakdown(lot_id=parking_lot_id, day_of_week=day)
+        return result
+    except Exception as e:
+        import traceback
+        print(f"Error in get_occupancy_time_breakdown: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/parking/toggle-random-mode")
+def toggle_random_mode():
+    try:
+        forecasting.RANDOM_MODE = not forecasting.RANDOM_MODE
+        return {"random_mode": forecasting.RANDOM_MODE, "message": f"Random mode is now {'enabled' if forecasting.RANDOM_MODE else 'disabled'}"}
+    except Exception as e:
+        import traceback
+        print(f"Error toggling random mode: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/parking/live-status", response_model=List[LiveStatusResponse])
