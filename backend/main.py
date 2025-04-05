@@ -356,6 +356,7 @@ def read_root():
             "users": "/user/*",
             "parking": "/parking/*",
             "parking_live_status": "/parking/live-status",
+            "parking_live_status_campus": "/parking/live-status/campus/{campus}",
             "reservations": "/reservation/*",
             "admin": "/admin/*",
         },
@@ -846,6 +847,57 @@ def get_parking_lot_live_status(parking_lot_id: int, db: sqlite3.Connection = De
     except Exception as e:
         import traceback
         print(f"Error in get_parking_lot_live_status: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/parking/live-status/campus/{campus}", response_model=List[LiveStatusResponse])
+def get_campus_live_status(campus: str, db: sqlite3.Connection = Depends(get_db)):
+    try:
+        cursor = db.cursor()
+        search_pattern = f"%{campus}%"
+        cursor.execute("""
+            SELECT p.parkingLotID, p.name, p.location, p.capacity, p.reserved_slots
+            FROM parking_lots p
+            WHERE p.location LIKE ?
+            ORDER BY p.parkingLotID
+        """, (search_pattern,))
+        lots = cursor.fetchall()
+        
+        if not lots:
+            raise HTTPException(status_code=404, detail=f"No parking lots found for campus: {campus}")
+        
+        current_time = datetime.now().isoformat()
+        result = []
+        
+        for lot in lots:
+            capacity = lot["capacity"]
+            reserved = lot["reserved_slots"]
+            available = capacity - reserved
+            occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
+            
+            status = "Available"
+            if occupancy_percentage > 80:
+                status = "Busy"
+            elif occupancy_percentage > 50:
+                status = "Moderate"
+            
+            result.append(LiveStatusResponse(
+                parkingLotID=lot["parkingLotID"],
+                name=lot["name"],
+                location=lot["location"],
+                totalSpots=capacity,
+                occupiedSpots=reserved,
+                availableSpots=available,
+                occupancyPercentage=round(occupancy_percentage, 1),
+                status=status,
+                lastUpdated=current_time
+            ))
+        
+        return result
+    except Exception as e:
+        import traceback
+        print(f"Error in get_campus_live_status: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
