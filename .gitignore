@@ -174,3 +174,5 @@ cython_debug/
 
 # Test logs
 performance_test_*.csv
+
+backend/models/arima_models.pkl
