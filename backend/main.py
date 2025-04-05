@@ -573,7 +573,14 @@ def get_parking_lots(db: sqlite3.Connection = Depends(get_db)):
             print(f"Warning: No parking lots found in database")
             return []
 
-        return [ParkingLotOut(**dict(lot)) for lot in lots]
+        result = []
+        for lot in lots:
+            lot_dict = dict(lot)
+            if lot_dict["reserved_slots"] > lot_dict["capacity"]:
+                lot_dict["reserved_slots"] = lot_dict["capacity"]
+            result.append(ParkingLotOut(**lot_dict))
+            
+        return result
     except Exception as e:
         import traceback
 
@@ -616,7 +623,14 @@ def get_parking_lots_by_campus(campus: str, db: sqlite3.Connection = Depends(get
             print(f"Warning: No parking lots found for campus: {campus}")
             return []
 
-        return [ParkingLotOut(**dict(lot)) for lot in lots]
+        result = []
+        for lot in lots:
+            lot_dict = dict(lot)
+            if lot_dict["reserved_slots"] > lot_dict["capacity"]:
+                lot_dict["reserved_slots"] = lot_dict["capacity"]
+            result.append(ParkingLotOut(**lot_dict))
+            
+        return result
     except Exception as e:
         import traceback
 
@@ -636,7 +650,11 @@ def get_parking_lot(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db
     if row is None:
         raise HTTPException(status_code=404, detail="Parking lot not found")
 
-    return ParkingLotOut(**dict(row))
+    lot_dict = dict(row)
+    if lot_dict["reserved_slots"] > lot_dict["capacity"]:
+        lot_dict["reserved_slots"] = lot_dict["capacity"]
+
+    return ParkingLotOut(**lot_dict)
 
 
 @app.post("/parking/lots", response_model=ParkingLotOut)
