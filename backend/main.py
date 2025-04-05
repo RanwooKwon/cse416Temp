@@ -311,7 +311,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -854,8 +854,8 @@ def get_all_live_status(db: sqlite3.Connection = Depends(get_db)):
 
         for lot in lots:
             capacity = lot["capacity"]
-            reserved = lot["reserved_slots"]
-            available = capacity - reserved
+            reserved = min(lot["reserved_slots"], capacity)
+            available = max(0, capacity - reserved)
             occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
 
             status = "Available"
@@ -974,8 +974,8 @@ def get_campus_live_status(campus: str, db: sqlite3.Connection = Depends(get_db)
 
         for lot in lots:
             capacity = lot["capacity"]
-            reserved = lot["reserved_slots"]
-            available = capacity - reserved
+            reserved = min(lot["reserved_slots"], capacity)
+            available = max(0, capacity - reserved)
             occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
 
             status = "Available"

@@ -13,7 +13,7 @@ _forecast_cache = {}
 _last_forecast_update = datetime.now() - timedelta(days=1)
 _FORECAST_CACHE_TTL = 3600
 _arima_models = {}
-RANDOM_MODE = True
+RANDOM_MODE = False
 
 
 def _get_historical_data(parking_lot_id: int, days_back: int = 30) -> List[Dict]:
@@ -242,13 +242,16 @@ def get_daily_pattern(lot_id: int, day_of_week: Optional[int] = None) -> Dict:
     
     current_capacity = _get_current_capacity(lot_id)
     capacity = max(1, current_capacity["capacity"])
+    current_occupancy_rate = min(1.0, current_capacity["reserved_slots"] / capacity)
     
     current_day = int(current_time.strftime("%w"))
+    current_hour = int(current_time.strftime("%H"))
     days_ahead = (day_of_week - current_day) % 7
     if days_ahead == 0:
         days_ahead = 7  # next week if today is the requested day
     
     target_date = current_time + timedelta(days=days_ahead)
+    is_current_day = (day_of_week == current_day)
     
     for hour in hours:
         hour_str = str(hour).zfill(2)
@@ -256,7 +259,7 @@ def get_daily_pattern(lot_id: int, day_of_week: Optional[int] = None) -> Dict:
         
         if hour_data:
             count = hour_data[0]["reservation_count"]
-            occupancy_rate = min(100, round((count / capacity) * 100, 1))
+            historical_rate = count / capacity
         else:
             similar_hours = []
             for h in range(max(0, hour-1), min(24, hour+2)):
@@ -267,31 +270,40 @@ def get_daily_pattern(lot_id: int, day_of_week: Optional[int] = None) -> Dict:
             
             if similar_hours:
                 avg_count = sum(d["reservation_count"] for d in similar_hours) / len(similar_hours)
-                occupancy_rate = min(100, round((avg_count / capacity) * 100, 1))
+                historical_rate = avg_count / capacity
             else:
-                occupancy_rate = min(100, round((current_capacity["reserved_slots"] / capacity) * 100, 1))
+                historical_rate = 0.01
+        
+        if is_current_day and hour == current_hour:
+            current_weight = 0.8
+            historical_weight = 0.2
+            occupancy_rate = current_weight * current_occupancy_rate + historical_weight * historical_rate
+        else:
+            occupancy_rate = historical_rate
+        
+        occupancy_by_hour.append(min(100, round(occupancy_rate * 100, 1)))
         
         forecast_time = target_date.replace(hour=hour, minute=0, second=0)
         
-        if occupancy_rate > 0:
-            forecast_base = occupancy_rate / 100.0
-            
+        if occupancy_rate > 0.01:
             if RANDOM_MODE:
                 variation = 0.15
                 seed_val = (lot_id * 1000) + (day_of_week * 100) + hour
                 np.random.seed(seed_val)
                 
                 random_factor = 1 + (np.random.random() * variation * 2 - variation)
-                forecast_rate = min(100, round(forecast_base * random_factor * 100, 1))
+                forecast_rate = min(1.0, max(0.0, occupancy_rate * random_factor))
             else:
-                # Without randomness, just use the historical rate with a slight increase (3%)
-                forecast_rate = min(100, round(forecast_base * 103, 1) / 100)
+                forecast_rate = min(1.0, occupancy_rate * 1.03)
         else:
             future_occupancy = _predict_parking_lot_occupancy(lot_id, forecast_time)
-            forecast_rate = min(100, round(future_occupancy * 100, 1))
+            forecast_rate = future_occupancy
         
-        occupancy_by_hour.append(occupancy_rate)
-        forecast_by_hour.append(forecast_rate)
+        if is_current_day and current_occupancy_rate > 0.9 and hour >= current_hour and hour <= current_hour + 2:
+            decay_factor = 1.0 - ((hour - current_hour) * 0.1)
+            forecast_rate = max(forecast_rate, current_occupancy_rate * decay_factor)
+            
+        forecast_by_hour.append(min(100, round(forecast_rate * 100, 1)))
     
     return {
         "day": day_of_week,
@@ -305,6 +317,7 @@ def get_daily_pattern(lot_id: int, day_of_week: Optional[int] = None) -> Dict:
 def get_weekly_pattern(lot_id: int) -> Dict:
     current_capacity = _get_current_capacity(lot_id)
     capacity = max(1, current_capacity["capacity"])
+    current_occupancy_rate = min(1.0, current_capacity["reserved_slots"] / capacity)
     
     historical_data = _get_historical_data(lot_id, days_back=60)
     days = list(range(7))
@@ -314,6 +327,11 @@ def get_weekly_pattern(lot_id: int) -> Dict:
     afternoon_data = []
     evening_data = []
     
+    current_day = int(datetime.now().strftime("%w"))
+    current_hour = int(datetime.now().strftime("%H"))
+    current_weight = 0.7
+    historical_weight = 0.3
+    
     for day in days:
         day_str = str(day)
         day_data = [d for d in historical_data if d["day_of_week"] == day_str]
@@ -321,17 +339,38 @@ def get_weekly_pattern(lot_id: int) -> Dict:
         morning_hours = [str(h).zfill(2) for h in range(6, 12)]
         morning_records = [d for d in day_data if d["hour_of_day"] in morning_hours]
         morning_avg = sum([d["reservation_count"] for d in morning_records]) / max(1, len(morning_records))
-        morning_data.append(min(100, round((morning_avg / capacity) * 100, 1)))
         
         afternoon_hours = [str(h).zfill(2) for h in range(12, 18)]
         afternoon_records = [d for d in day_data if d["hour_of_day"] in afternoon_hours]
         afternoon_avg = sum([d["reservation_count"] for d in afternoon_records]) / max(1, len(afternoon_records))
-        afternoon_data.append(min(100, round((afternoon_avg / capacity) * 100, 1)))
         
         evening_hours = [str(h).zfill(2) for h in range(18, 24)]
         evening_records = [d for d in day_data if d["hour_of_day"] in evening_hours]
         evening_avg = sum([d["reservation_count"] for d in evening_records]) / max(1, len(evening_records))
-        evening_data.append(min(100, round((evening_avg / capacity) * 100, 1)))
+        
+        if day == current_day:
+            if 6 <= current_hour < 12:
+                morning_rate = current_weight * current_occupancy_rate + historical_weight * (morning_avg / capacity)
+            else:
+                morning_rate = morning_avg / capacity
+                
+            if 12 <= current_hour < 18:
+                afternoon_rate = current_weight * current_occupancy_rate + historical_weight * (afternoon_avg / capacity)
+            else:
+                afternoon_rate = afternoon_avg / capacity
+                
+            if 18 <= current_hour < 24:
+                evening_rate = current_weight * current_occupancy_rate + historical_weight * (evening_avg / capacity)
+            else:
+                evening_rate = evening_avg / capacity
+        else:
+            morning_rate = morning_avg / capacity
+            afternoon_rate = afternoon_avg / capacity
+            evening_rate = evening_avg / capacity
+        
+        morning_data.append(min(100, round(morning_rate * 100, 1)))
+        afternoon_data.append(min(100, round(afternoon_rate * 100, 1)))
+        evening_data.append(min(100, round(evening_rate * 100, 1)))
     
     return {
         "days": day_names,
@@ -351,6 +390,8 @@ def get_time_breakdown(lot_id: int, day_of_week: Optional[int] = None) -> Dict:
     current_capacity = _get_current_capacity(lot_id)
     capacity = max(1, current_capacity["capacity"])
     
+    current_occupancy_rate = min(1.0, current_capacity["reserved_slots"] / capacity)
+    
     morning_hours = [str(h).zfill(2) for h in range(6, 12)]
     afternoon_hours = [str(h).zfill(2) for h in range(12, 18)]
     evening_hours = [str(h).zfill(2) for h in range(18, 24)]
@@ -368,25 +409,54 @@ def get_time_breakdown(lot_id: int, day_of_week: Optional[int] = None) -> Dict:
     night_records = [d for d in day_data if d["hour_of_day"] in night_hours]
     night_avg = sum([d["reservation_count"] for d in night_records]) / max(1, len(night_records))
     
+    current_hour = int(datetime.now().strftime("%H"))
+    current_weight = 0.7
+    historical_weight = 0.3
+    
+    morning_rate = 0
+    afternoon_rate = 0
+    evening_rate = 0
+    night_rate = 0
+    
+    if 6 <= current_hour < 12:
+        morning_rate = current_weight * current_occupancy_rate + historical_weight * (morning_avg / capacity)
+    else:
+        morning_rate = morning_avg / capacity
+        
+    if 12 <= current_hour < 18:
+        afternoon_rate = current_weight * current_occupancy_rate + historical_weight * (afternoon_avg / capacity)
+    else:
+        afternoon_rate = afternoon_avg / capacity
+        
+    if 18 <= current_hour < 24:
+        evening_rate = current_weight * current_occupancy_rate + historical_weight * (evening_avg / capacity)
+    else:
+        evening_rate = evening_avg / capacity
+        
+    if 0 <= current_hour < 6:
+        night_rate = current_weight * current_occupancy_rate + historical_weight * (night_avg / capacity)
+    else:
+        night_rate = night_avg / capacity
+    
     return {
         "day": day_of_week,
         "day_name": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][day_of_week],
         "periods": [
             {
                 "time": "Morning (6AM-12PM)",
-                "occupancy": min(100, round((morning_avg / capacity) * 100, 1))
+                "occupancy": min(100, round(morning_rate * 100, 1))
             },
             {
                 "time": "Afternoon (12PM-6PM)",
-                "occupancy": min(100, round((afternoon_avg / capacity) * 100, 1))
+                "occupancy": min(100, round(afternoon_rate * 100, 1))
             },
             {
                 "time": "Evening (6PM-12AM)",
-                "occupancy": min(100, round((evening_avg / capacity) * 100, 1))
+                "occupancy": min(100, round(evening_rate * 100, 1))
             },
             {
                 "time": "Night (12AM-6AM)",
-                "occupancy": min(100, round((night_avg / capacity) * 100, 1))
+                "occupancy": min(100, round(night_rate * 100, 1))
             }
         ]
     }
