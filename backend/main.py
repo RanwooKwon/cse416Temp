@@ -54,7 +54,7 @@ def get_password_hash(password):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
-            expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -268,7 +268,7 @@ class NearestLotsRequest(BaseModel):
 
 
 async def get_current_user(
-        token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)
+    token: str = Depends(oauth2_scheme), db: sqlite3.Connection = Depends(get_db)
 ):
     credentials_exception = HTTPException(
         status_code=401,
@@ -294,8 +294,8 @@ async def get_current_user(
 
 
 async def get_current_admin(
-        current_user: dict = Depends(get_current_user),
-        db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+    db: sqlite3.Connection = Depends(get_db),
 ):
     cursor = db.cursor()
     cursor.execute(
@@ -341,6 +341,22 @@ class LiveStatusResponse(BaseModel):
     lastUpdated: str
 
 
+class CampusSummaryResponse(BaseModel):
+    parkingLotID: int = -1  # -1 => means summary!!!
+    name: str = "Campus Summary"
+    location: str
+    totalSpots: int
+    occupiedSpots: int
+    availableSpots: int
+    occupancyPercentage: float
+    status: str
+    lastUpdated: str
+    lotCount: int
+    busyLots: int
+    moderateLots: int
+    availableLots: int
+
+
 @app.on_event("startup")
 def on_startup():
     init_db()
@@ -370,8 +386,8 @@ async def favicon():
 
 @app.post("/token", response_model=Token)
 def login_for_access_token(
-        form_data: OAuth2PasswordRequestForm = Depends(),
-        db: sqlite3.Connection = Depends(get_db),
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: sqlite3.Connection = Depends(get_db),
 ):
     cursor = db.cursor()
     cursor.execute("SELECT * FROM users WHERE email = ?", (form_data.username,))
@@ -401,11 +417,15 @@ def login_for_access_token(
 def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
     hashed_password = get_password_hash(user.password)
-    print('got here')
-    userType = user.userType if hasattr(user, 'userType') and user.userType else "Visitor"
-    phone = user.phone if hasattr(user, 'phone') and user.phone else None
-    sbuID = user.sbuID if hasattr(user, 'sbuID') and user.sbuID else None
-    licenseInfo = user.licenseInfo if hasattr(user, 'licenseInfo') and user.licenseInfo else None
+    print("got here")
+    userType = (
+        user.userType if hasattr(user, "userType") and user.userType else "Visitor"
+    )
+    phone = user.phone if hasattr(user, "phone") and user.phone else None
+    sbuID = user.sbuID if hasattr(user, "sbuID") and user.sbuID else None
+    licenseInfo = (
+        user.licenseInfo if hasattr(user, "licenseInfo") and user.licenseInfo else None
+    )
 
     print(userType, phone, sbuID, licenseInfo)
 
@@ -426,7 +446,9 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
         user_id = cursor.lastrowid
     except sqlite3.IntegrityError as e:
         print(f"Registration error: {str(e)}")
-        raise HTTPException(status_code=400, detail="Email already registered or SBU ID already exists")
+        raise HTTPException(
+            status_code=400, detail="Email already registered or SBU ID already exists"
+        )
 
     return UserOut(
         userID=user_id,
@@ -458,9 +480,9 @@ def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):
 
 @app.get("/user/{user_id}", response_model=UserOut)
 def get_user(
-        user_id: int,
-        db: sqlite3.Connection = Depends(get_db),
-        # current_user: dict = Depends(get_current_user),
+    user_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    # current_user: dict = Depends(get_current_user),
 ):
     # if current_user["userID"] != user_id:
     #     admin_cursor = db.cursor()
@@ -488,10 +510,10 @@ def get_user(
 
 @app.post("/user/{user_id}/cars", response_model=CarOut)
 def add_car(
-        user_id: int,
-        car: CarCreate,
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_user),
+    user_id: int,
+    car: CarCreate,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     if current_user["userID"] != user_id:
         raise HTTPException(
@@ -518,9 +540,9 @@ def add_car(
 
 @app.get("/user/{user_id}/cars", response_model=List[CarOut])
 def get_cars(
-        user_id: int,
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_user),
+    user_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     if current_user["userID"] != user_id:
         raise HTTPException(
@@ -559,13 +581,15 @@ def get_campus_list(db: sqlite3.Connection = Depends(get_db)):
     try:
         cursor = db.cursor()
         cursor.execute(
-            "SELECT DISTINCT substr(location, instr(location, ', ') + 2) AS campus FROM parking_lots ORDER BY campus")
+            "SELECT DISTINCT substr(location, instr(location, ', ') + 2) AS campus FROM parking_lots ORDER BY campus"
+        )
         results = cursor.fetchall()
 
         campuses = [row["campus"] for row in results if row["campus"]]
         return campuses
     except Exception as e:
         import traceback
+
         print(f"ERROR in get_campus_list: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -611,9 +635,9 @@ def get_parking_lot(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db
 
 @app.post("/parking/lots", response_model=ParkingLotOut)
 def create_parking_lot(
-        parking_lot: ParkingLotCreate,
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_admin),
+    parking_lot: ParkingLotCreate,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
 ):
     cursor = db.cursor()
     cursor.execute(
@@ -688,12 +712,12 @@ def find_nearest_lots_post(request: NearestLotsRequest):
 
 @app.get("/parking/nearest")
 def find_nearest_lots_get(
-        start_lat: float,
-        start_lng: float,
-        limit: Optional[int] = 5,
-        min_available: Optional[int] = 1,
-        prefer_ev: Optional[bool] = False,
-        max_distance: Optional[float] = None,
+    start_lat: float,
+    start_lng: float,
+    limit: Optional[int] = 5,
+    min_available: Optional[int] = 1,
+    prefer_ev: Optional[bool] = False,
+    max_distance: Optional[float] = None,
 ):
     return pathfinder.find_nearest_available_lots(
         start_lat=start_lat,
@@ -716,11 +740,12 @@ def get_parking_forecast(parking_lot_id: int, hours_ahead: Optional[int] = 12):
     try:
         forecast_data = forecasting.get_parking_lot_forecast(
             lot_id=parking_lot_id,
-            hours_ahead=min(24, max(1, hours_ahead))  # Limit to 1-24 hours
+            hours_ahead=min(24, max(1, hours_ahead)),  # Limit to 1-24 hours
         )
         return {"forecast": forecast_data}
     except Exception as e:
         import traceback
+
         print(f"Error in get_parking_forecast: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
@@ -730,8 +755,7 @@ def get_parking_forecast(parking_lot_id: int, hours_ahead: Optional[int] = 12):
 def get_parking_forecast_post(request: ForecastRequest):
     """Get parking lot occupancy forecast for the specified hours ahead (POST endpoint)."""
     return get_parking_forecast(
-        parking_lot_id=request.parkingLotID,
-        hours_ahead=request.hours_ahead
+        parking_lot_id=request.parkingLotID, hours_ahead=request.hours_ahead
     )
 
 
@@ -741,11 +765,12 @@ def get_best_parking_time(parking_lot_id: int, time_window_hours: Optional[int] 
     try:
         best_time = forecasting.get_best_parking_time(
             lot_id=parking_lot_id,
-            time_window_hours=min(48, max(3, time_window_hours))  # Limit to 3-48 hours
+            time_window_hours=min(48, max(3, time_window_hours)),  # Limit to 3-48 hours
         )
         return best_time
     except Exception as e:
         import traceback
+
         print(f"Error in get_best_parking_time: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
@@ -755,8 +780,7 @@ def get_best_parking_time(parking_lot_id: int, time_window_hours: Optional[int] 
 def get_best_parking_time_post(request: BestTimeRequest):
     """Find the best time to park in the given time window (POST endpoint)."""
     return get_best_parking_time(
-        parking_lot_id=request.parkingLotID,
-        time_window_hours=request.time_window_hours
+        parking_lot_id=request.parkingLotID, time_window_hours=request.time_window_hours
     )
 
 
@@ -770,69 +794,77 @@ def get_all_live_status(db: sqlite3.Connection = Depends(get_db)):
             ORDER BY p.parkingLotID
         """)
         lots = cursor.fetchall()
-        
+
         current_time = datetime.now().isoformat()
         result = []
-        
+
         for lot in lots:
             capacity = lot["capacity"]
             reserved = lot["reserved_slots"]
             available = capacity - reserved
             occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
-            
+
             status = "Available"
             if occupancy_percentage > 80:
                 status = "Busy"
             elif occupancy_percentage > 50:
                 status = "Moderate"
-            
-            result.append(LiveStatusResponse(
-                parkingLotID=lot["parkingLotID"],
-                name=lot["name"],
-                location=lot["location"],
-                totalSpots=capacity,
-                occupiedSpots=reserved,
-                availableSpots=available,
-                occupancyPercentage=round(occupancy_percentage, 1),
-                status=status,
-                lastUpdated=current_time
-            ))
-        
+
+            result.append(
+                LiveStatusResponse(
+                    parkingLotID=lot["parkingLotID"],
+                    name=lot["name"],
+                    location=lot["location"],
+                    totalSpots=capacity,
+                    occupiedSpots=reserved,
+                    availableSpots=available,
+                    occupancyPercentage=round(occupancy_percentage, 1),
+                    status=status,
+                    lastUpdated=current_time,
+                )
+            )
+
         return result
     except Exception as e:
         import traceback
+
         print(f"Error in get_all_live_status: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/parking/live-status/{parking_lot_id}", response_model=LiveStatusResponse)
-def get_parking_lot_live_status(parking_lot_id: int, db: sqlite3.Connection = Depends(get_db)):
+def get_parking_lot_live_status(
+    parking_lot_id: int, db: sqlite3.Connection = Depends(get_db)
+):
     try:
         cursor = db.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT p.parkingLotID, p.name, p.location, p.capacity, p.reserved_slots
             FROM parking_lots p
             WHERE p.parkingLotID = ?
-        """, (parking_lot_id,))
+        """,
+            (parking_lot_id,),
+        )
         lot = cursor.fetchone()
-        
+
         if not lot:
             raise HTTPException(status_code=404, detail="Parking lot not found")
-        
+
         capacity = lot["capacity"]
         reserved = lot["reserved_slots"]
         available = capacity - reserved
         occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
-        
+
         status = "Available"
         if occupancy_percentage > 80:
             status = "Busy"
         elif occupancy_percentage > 50:
             status = "Moderate"
-        
+
         current_time = datetime.now().isoformat()
-        
+
         return LiveStatusResponse(
             parkingLotID=lot["parkingLotID"],
             name=lot["name"],
@@ -842,61 +874,118 @@ def get_parking_lot_live_status(parking_lot_id: int, db: sqlite3.Connection = De
             availableSpots=available,
             occupancyPercentage=round(occupancy_percentage, 1),
             status=status,
-            lastUpdated=current_time
+            lastUpdated=current_time,
         )
     except Exception as e:
         import traceback
+
         print(f"Error in get_parking_lot_live_status: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/parking/live-status/campus/{campus}", response_model=List[LiveStatusResponse])
+@app.get(
+    "/parking/live-status/campus/{campus}",
+    response_model=List[Union[LiveStatusResponse, CampusSummaryResponse]],
+)
 def get_campus_live_status(campus: str, db: sqlite3.Connection = Depends(get_db)):
     try:
         cursor = db.cursor()
         search_pattern = f"%{campus}%"
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT p.parkingLotID, p.name, p.location, p.capacity, p.reserved_slots
             FROM parking_lots p
             WHERE p.location LIKE ?
             ORDER BY p.parkingLotID
-        """, (search_pattern,))
+        """,
+            (search_pattern,),
+        )
         lots = cursor.fetchall()
-        
+
         if not lots:
-            raise HTTPException(status_code=404, detail=f"No parking lots found for campus: {campus}")
-        
+            raise HTTPException(
+                status_code=404, detail=f"No parking lots found for campus: {campus}"
+            )
+
         current_time = datetime.now().isoformat()
         result = []
-        
+
+        total_capacity = 0
+        total_reserved = 0
+        busy_lots = 0
+        moderate_lots = 0
+        available_lots = 0
+        campus_location = campus
+
         for lot in lots:
             capacity = lot["capacity"]
             reserved = lot["reserved_slots"]
             available = capacity - reserved
             occupancy_percentage = (reserved / capacity * 100) if capacity > 0 else 0
-            
+
             status = "Available"
             if occupancy_percentage > 80:
                 status = "Busy"
+                busy_lots += 1
             elif occupancy_percentage > 50:
                 status = "Moderate"
-            
-            result.append(LiveStatusResponse(
-                parkingLotID=lot["parkingLotID"],
-                name=lot["name"],
-                location=lot["location"],
-                totalSpots=capacity,
-                occupiedSpots=reserved,
-                availableSpots=available,
-                occupancyPercentage=round(occupancy_percentage, 1),
-                status=status,
-                lastUpdated=current_time
-            ))
-        
+                moderate_lots += 1
+            else:
+                available_lots += 1
+
+            total_capacity += capacity
+            total_reserved += reserved
+
+            if result == []:
+                location_parts = lot["location"].split(", ")
+                if len(location_parts) > 1:
+                    campus_location = location_parts[-1]
+
+            result.append(
+                LiveStatusResponse(
+                    parkingLotID=lot["parkingLotID"],
+                    name=lot["name"],
+                    location=lot["location"],
+                    totalSpots=capacity,
+                    occupiedSpots=reserved,
+                    availableSpots=available,
+                    occupancyPercentage=round(occupancy_percentage, 1),
+                    status=status,
+                    lastUpdated=current_time,
+                )
+            )
+
+        total_available = total_capacity - total_reserved
+        campus_occupancy = (
+            (total_reserved / total_capacity * 100) if total_capacity > 0 else 0
+        )
+        campus_status = "Available"
+        if campus_occupancy > 80:
+            campus_status = "Busy"
+        elif campus_occupancy > 50:
+            campus_status = "Moderate"
+
+        summary = CampusSummaryResponse(
+            location=f"{campus_location}",
+            totalSpots=total_capacity,
+            occupiedSpots=total_reserved,
+            availableSpots=total_available,
+            occupancyPercentage=round(campus_occupancy, 1),
+            status=campus_status,
+            lastUpdated=current_time,
+            lotCount=len(lots),
+            busyLots=busy_lots,
+            moderateLots=moderate_lots,
+            availableLots=available_lots,
+        )
+
+        result.append(summary)
+
         return result
     except Exception as e:
         import traceback
+
         print(f"Error in get_campus_live_status: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
@@ -904,8 +993,8 @@ def get_campus_live_status(campus: str, db: sqlite3.Connection = Depends(get_db)
 
 @app.post("/reservation", response_model=ReservationOut)
 async def create_reservation(
-        reservation: ReservationCreate,
-        current_user: dict = Depends(get_current_user),
+    reservation: ReservationCreate,
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Create a new parking reservation with optimized handling for concurrent requests.
@@ -916,16 +1005,16 @@ async def create_reservation(
             status_code=403,
             detail="Not authorized to create reservations for other users",
         )
-    
+
     import reservation_handler
-    
+
     result = reservation_handler.create_reservation(
         user_id=reservation.userID,
         parking_lot_id=reservation.parkingLotID,
         start_time=reservation.startTime,
-        end_time=reservation.endTime
+        end_time=reservation.endTime,
     )
-    
+
     return ReservationOut(
         reservationID=result["reservationID"],
         userID=result["userID"],
@@ -939,9 +1028,9 @@ async def create_reservation(
 
 @app.get("/reservation/{reservation_id}", response_model=ReservationOut)
 def get_reservation(
-        reservation_id: int,
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_user),
+    reservation_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     cursor = db.cursor()
     cursor.execute(
@@ -967,9 +1056,9 @@ def get_reservation(
 
 @app.get("/user/{user_id}/reservations", response_model=List[ReservationOut])
 def get_user_reservations(
-        user_id: int,
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_user),
+    user_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     if current_user["userID"] != user_id:
         cursor = db.cursor()
@@ -995,34 +1084,33 @@ def get_user_reservations(
 
 @app.delete("/reservation/{reservation_id}")
 def cancel_reservation(
-        reservation_id: int,
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_user),
+    reservation_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     cursor = db.cursor()
     is_admin = False
-    
+
     cursor.execute(
         "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
     )
     admin = cursor.fetchone()
     if admin is not None:
         is_admin = True
-    
+
     import reservation_handler
+
     result = reservation_handler.cancel_reservation(
-        reservation_id=reservation_id,
-        user_id=current_user["userID"],
-        is_admin=is_admin
+        reservation_id=reservation_id, user_id=current_user["userID"], is_admin=is_admin
     )
-    
+
     return result
 
 
 @app.get("/admin/users", response_model=List[UserOut])
 def get_all_users(
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_admin),
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
 ):
     cursor = db.cursor()
     cursor.execute("SELECT userID, userName, email, phone, userType FROM users")
@@ -1032,8 +1120,8 @@ def get_all_users(
 
 @app.get("/admin/parking-status")
 def get_parking_status(
-        db: sqlite3.Connection = Depends(get_db),
-        current_user: dict = Depends(get_current_admin),
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
 ):
     cursor = db.cursor()
     cursor.execute(
