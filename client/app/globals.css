@@ -70,6 +70,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -101,3 +102,74 @@ h3 {
   @apply text-2xl mb-3;
 }
 
+/* Fix calendar styling */
+.calendar-root button {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.calendar-cell {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* Target the specific button elements inside the calendar */
+.rdp-button {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  /* Add pointer cursor for clickable dates */
+}
+
+/* Make sure the cell takes up proper space */
+.rdp-cell {
+  padding: 0 !important;
+  width: 40px !important;
+  height: 40px !important;
+}
+
+/* Ensure the day wrapper fills the cell */
+.rdp-day {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Add specific styles for the table layout */
+.rdp-table {
+  width: 100% !important;
+}
+
+/* Make sure the button inside each cell fills the entire cell */
+.rdp-cell button {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Style for disabled dates - try multiple selectors to catch all cases */
+button[disabled],
+.rdp-button[disabled],
+.rdp-day_disabled,
+.text-muted-foreground.opacity-50 {
+  cursor: not-allowed !important;
+  /* Change cursor for disabled dates */
+}
+
+/* Target disabled buttons directly */
+button[aria-disabled="true"] {
+  cursor: not-allowed !important;
+}
+
+/* Style for outside dates (dates from previous/next month) */
+.rdp-day_outside button,
+.day-outside {
+  cursor: default !important;
+  /* Change cursor for outside dates */
+}
