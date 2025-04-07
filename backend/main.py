@@ -152,6 +152,7 @@ class UserBase(BaseModel):
     userType: Optional[str] = "Visitor"
     sbuID: Optional[int] = None
     licenseInfo: Optional[str] = None
+    status: Optional[str] = "pending"
 
     @validator("userType")
     def validate_user_type(cls, v):
@@ -167,6 +168,16 @@ class UserBase(BaseModel):
         if v not in valid_types:
             raise ValueError(f"userType must be one of {valid_types}")
         return v
+    
+    @validator("status")
+    def validate_status(cls, v):
+        if v is None:
+            return "pending"
+            
+        valid_statuses = ["pending", "approved", "declined"]
+        if v not in valid_statuses:
+            raise ValueError(f"status must be one of {valid_statuses}")
+        return v
 
 
 class UserRegister(BaseModel):
@@ -177,6 +188,7 @@ class UserRegister(BaseModel):
     phone: str = None
     sbuID: str = None
     licenseInfo: str = None
+    status: str = "pending"
 
 
 class UserOut(BaseModel):
@@ -185,6 +197,7 @@ class UserOut(BaseModel):
     email: EmailStr
     phone: Optional[str] = None
     userType: str
+    status: str
 
 
 class UserLogin(BaseModel):
@@ -437,7 +450,7 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
 
     try:
         cursor.execute(
-            "INSERT INTO users (email, userName, phone, password, userType, sbuID, licenseInfo) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO users (email, userName, phone, password, userType, sbuID, licenseInfo, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user.email,
                 user.userName,
@@ -446,6 +459,7 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
                 userType,
                 sbuID,
                 licenseInfo,
+                user.status,
             ),
         )
         db.commit()
@@ -462,6 +476,7 @@ def register_user(user: UserRegister, db: sqlite3.Connection = Depends(get_db)):
         email=user.email,
         phone=phone,
         userType=userType,
+        status=user.status,
     )
 
 
@@ -481,7 +496,7 @@ def login_user(user: UserLogin, db: sqlite3.Connection = Depends(get_db)):
         expires_delta=access_token_expires,
     )
 
-    return {"token": access_token, "userId": row["userID"]}
+    return {"token": access_token, "userId": row["userID"], "status": row["status"]}
 
 
 @app.get("/user/{user_id}", response_model=UserOut)
@@ -503,7 +518,7 @@ def get_user(
 
     cursor = db.cursor()
     cursor.execute(
-        "SELECT userID, userName, email, phone, userType FROM users WHERE userID = ?",
+        "SELECT userID, userName, email, phone, userType, status FROM users WHERE userID = ?",
         (user_id,),
     )
     row = cursor.fetchone()
@@ -1185,9 +1200,96 @@ def get_all_users(
     current_user: dict = Depends(get_current_admin),
 ):
     cursor = db.cursor()
-    cursor.execute("SELECT userID, userName, email, phone, userType FROM users")
+    cursor.execute("SELECT userID, userName, email, phone, userType, status FROM users")
     rows = cursor.fetchall()
     return [UserOut(**dict(row)) for row in rows]
+
+
+class UserUpdate(BaseModel):
+    userName: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    userType: Optional[str] = None
+    sbuID: Optional[int] = None
+    licenseInfo: Optional[str] = None
+    status: Optional[str] = None
+
+
+@app.put("/admin/users/{user_id}", response_model=UserOut)
+def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
+):
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE userID = ?", (user_id,))
+    existing_user = cursor.fetchone()
+    
+    if existing_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    update_fields = {}
+    if user_update.userName is not None:
+        update_fields["userName"] = user_update.userName
+    if user_update.email is not None:
+        update_fields["email"] = user_update.email
+    if user_update.phone is not None:
+        update_fields["phone"] = user_update.phone
+    if user_update.userType is not None:
+        update_fields["userType"] = user_update.userType
+    if user_update.sbuID is not None:
+        update_fields["sbuID"] = user_update.sbuID
+    if user_update.licenseInfo is not None:
+        update_fields["licenseInfo"] = user_update.licenseInfo
+    if user_update.status is not None:
+        update_fields["status"] = user_update.status
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    set_clause = ", ".join([f"{field} = ?" for field in update_fields.keys()])
+    values = list(update_fields.values())
+    values.append(user_id)
+    
+    try:
+        cursor.execute(
+            f"UPDATE users SET {set_clause} WHERE userID = ?",
+            tuple(values),
+        )
+        db.commit()
+    except sqlite3.IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
+    
+    cursor.execute(
+        "SELECT userID, userName, email, phone, userType, status FROM users WHERE userID = ?",
+        (user_id,),
+    )
+    updated_user = cursor.fetchone()
+    return UserOut(**dict(updated_user))
+
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(
+    user_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    current_user: dict = Depends(get_current_admin),
+):
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE userID = ?", (user_id,))
+    existing_user = cursor.fetchone()
+    
+    if existing_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    try:
+        cursor.execute("DELETE FROM users WHERE userID = ?", (user_id,))
+        db.commit()
+        return {"status": "success", "message": f"User {user_id} has been deleted"}
+    except sqlite3.Error as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
 
 
 @app.get("/admin/parking-status")
