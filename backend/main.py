@@ -16,6 +16,7 @@ from db_manager import get_db_connection, execute_query, execute_write_query
 import asyncio
 import os
 from contextlib import asynccontextmanager
+import feedback_handler
 
 DATABASE = "parking.db"
 SECRET_KEY = "SECRET"
@@ -114,6 +115,8 @@ def init_db():
                 date DATETIME NOT NULL,
                 message TEXT NOT NULL,
                 rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+                reply TEXT,
+                type TEXT,
                 FOREIGN KEY (userID) REFERENCES users(userID) ON DELETE CASCADE
             )""")
 
@@ -366,6 +369,56 @@ class LiveStatusResponse(BaseModel):
     lastUpdated: str
 
 
+class FeedbackCreate(BaseModel):
+    message: str
+    rating: Optional[int] = None
+    reply: Optional[str] = None
+    type: Optional[str] = None
+    
+    @validator("rating")
+    def validate_rating(cls, v):
+        if v is not None and (v < 1 or v > 5):
+            raise ValueError("Rating must be between 1 and 5")
+        return v
+    
+    @validator("type")
+    def validate_type(cls, v):
+        valid_types = ["General", "Bug Report", "Feature Request", "Support", "Complaint"]
+        if v is not None and v not in valid_types:
+            raise ValueError(f"Type must be one of {valid_types}")
+        return v
+
+
+class FeedbackUpdate(BaseModel):
+    message: Optional[str] = None
+    rating: Optional[int] = None
+    reply: Optional[str] = None
+    type: Optional[str] = None
+    
+    @validator("rating")
+    def validate_rating(cls, v):
+        if v is not None and (v < 1 or v > 5):
+            raise ValueError("Rating must be between 1 and 5")
+        return v
+    
+    @validator("type")
+    def validate_type(cls, v):
+        valid_types = ["General", "Bug Report", "Feature Request", "Support", "Complaint"]
+        if v is not None and v not in valid_types:
+            raise ValueError(f"Type must be one of {valid_types}")
+        return v
+
+
+class FeedbackResponse(BaseModel):
+    feedbackID: int
+    userID: int
+    date: str
+    message: str
+    rating: Optional[int] = None
+    reply: Optional[str] = None
+    type: Optional[str] = None
+
+
 class CampusSummaryResponse(BaseModel):
     parkingLotID: int = -1  # -1 => means summary!!!
     name: str = "Campus Summary"
@@ -405,6 +458,7 @@ def read_root():
             "parking_time_breakdown": "/parking/time-breakdown/{parking_lot_id}",
             "parking_toggle_random": "/parking/toggle-random-mode",
             "reservations": "/reservation/*",
+            "feedback": "/feedback/*",
             "admin": "/admin/*",
         },
     }
@@ -1320,6 +1374,128 @@ def get_parking_status(
     available = total - reserved
 
     return {"totalSlots": total, "reservedSlots": reserved, "availableSlots": available}
+
+
+# ---------------------- FEEDBACK ENDPOINTS ---------------------- #
+@app.post("/feedback", response_model=FeedbackResponse)
+def create_user_feedback(
+    feedback: FeedbackCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    result = feedback_handler.create_feedback(
+        user_id=current_user["userID"],
+        message=feedback.message,
+        rating=feedback.rating,
+        reply=feedback.reply,
+        feedback_type=feedback.type
+    )
+    return FeedbackResponse(**result)
+
+
+@app.get("/feedback/{feedback_id}", response_model=FeedbackResponse)
+def get_feedback_by_id(
+    feedback_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    result = feedback_handler.get_feedback(feedback_id)
+    
+    is_admin = False
+    cursor = sqlite3.connect(DATABASE).cursor()
+    cursor.execute(
+        "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+    )
+    admin = cursor.fetchone()
+    if admin is not None:
+        is_admin = True
+        
+    if not is_admin and result["userID"] != current_user["userID"]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to view this feedback"
+        )
+        
+    return FeedbackResponse(**result)
+
+
+@app.get("/user/{user_id}/feedback", response_model=List[FeedbackResponse])
+def get_user_feedback_list(
+    user_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    is_admin = False
+    cursor = sqlite3.connect(DATABASE).cursor()
+    cursor.execute(
+        "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+    )
+    admin = cursor.fetchone()
+    if admin is not None:
+        is_admin = True
+        
+    if not is_admin and user_id != current_user["userID"]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to view feedback for this user"
+        )
+        
+    results = feedback_handler.get_user_feedback(user_id)
+    return [FeedbackResponse(**result) for result in results]
+
+
+@app.put("/feedback/{feedback_id}", response_model=FeedbackResponse)
+def update_feedback_by_id(
+    feedback_id: int,
+    feedback: FeedbackUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    is_admin = False
+    cursor = sqlite3.connect(DATABASE).cursor()
+    cursor.execute(
+        "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+    )
+    admin = cursor.fetchone()
+    if admin is not None:
+        is_admin = True
+        
+    result = feedback_handler.update_feedback(
+        feedback_id=feedback_id,
+        user_id=current_user["userID"],
+        is_admin=is_admin,
+        message=feedback.message,
+        rating=feedback.rating,
+        reply=feedback.reply,
+        feedback_type=feedback.type
+    )
+    
+    return FeedbackResponse(**result)
+
+
+@app.delete("/feedback/{feedback_id}")
+def delete_feedback_by_id(
+    feedback_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    is_admin = False
+    cursor = sqlite3.connect(DATABASE).cursor()
+    cursor.execute(
+        "SELECT * FROM administrators WHERE userID = ?", (current_user["userID"],)
+    )
+    admin = cursor.fetchone()
+    if admin is not None:
+        is_admin = True
+        
+    result = feedback_handler.delete_feedback(
+        feedback_id=feedback_id,
+        user_id=current_user["userID"],
+        is_admin=is_admin
+    )
+    
+    return result
+
+
+@app.get("/admin/feedback", response_model=List[FeedbackResponse])
+def get_all_feedback(
+    current_user: dict = Depends(get_current_admin),
+):
+    results = feedback_handler.get_all_feedback()
+    return [FeedbackResponse(**result) for result in results]
 
 
 # ---------------------- RUN APP ---------------------- #
