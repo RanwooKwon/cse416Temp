@@ -48,7 +48,7 @@ export default function ProfilePage() {
         }
 
         // Fetch user profile data
-        const profileResponse = await fetch(`http://localhost:8000/user/${userId}`, {
+        const profileResponse = await fetch(`https://p4sbu-yu75.onrender.com/user/${userId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -62,7 +62,7 @@ export default function ProfilePage() {
         setProfile(profileData)
 
         // Fetch user feedback data
-        const feedbackResponse = await fetch(`http://localhost:8000/user/${userId}/feedback`, {
+        const feedbackResponse = await fetch(`https://p4sbu-yu75.onrender.com/user/${userId}/feedback`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

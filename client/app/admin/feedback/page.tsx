@@ -68,7 +68,7 @@ export default function AdminFeedbackPage() {
         throw new Error("Authentication token not found. Please log in again.")
       }
 
-      const response = await fetch("http://localhost:8000/admin/feedback", {
+      const response = await fetch("https://p4sbu-yu75.onrender.com/admin/feedback", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -162,7 +162,7 @@ export default function AdminFeedbackPage() {
       }
 
       // Send the update to the API using the correct endpoint
-      const response = await fetch(`http://localhost:8000/feedback/${id}`, {
+      const response = await fetch(`https://p4sbu-yu75.onrender.com/feedback/${id}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,

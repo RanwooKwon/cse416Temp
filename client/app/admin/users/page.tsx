@@ -106,7 +106,7 @@ export default function UserManagementPage() {
     setError(null)
 
     try {
-      const response = await fetch("http://localhost:8000/admin/users")
+      const response = await fetch("https://p4sbu-yu75.onrender.com/admin/users")
 
       if (!response.ok) {
         throw new Error(`Error fetching users: ${response.status}`)
@@ -140,7 +140,7 @@ export default function UserManagementPage() {
       }
 
       // Send POST request to register endpoint
-      const response = await fetch("http://localhost:8000/user/register", {
+      const response = await fetch("https://p4sbu-yu75.onrender.com/user/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -213,7 +213,7 @@ export default function UserManagementPage() {
       }
 
       // Send PUT request to update user status
-      const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
+      const response = await fetch(`https://p4sbu-yu75.onrender.com/admin/users/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -255,7 +255,7 @@ export default function UserManagementPage() {
 
     try {
       // Send DELETE request to remove the user
-      const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
+      const response = await fetch(`https://p4sbu-yu75.onrender.com/admin/users/${id}`, {
         method: "DELETE",
       })
 
@@ -316,7 +316,7 @@ export default function UserManagementPage() {
         status: editingUser.status,
       }
 
-      const response = await fetch(`http://localhost:8000/admin/users/${editingUser.userID}`, {
+      const response = await fetch(`https://p4sbu-yu75.onrender.com/admin/users/${editingUser.userID}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

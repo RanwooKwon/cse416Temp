@@ -65,7 +65,7 @@ export default function RegistrationForm() {
 
     try {
       // 직접 백엔드 서버로 요청
-      const response = await fetch("http://localhost:8000/user/register", {
+      const response = await fetch("https://p4sbu-yu75.onrender.com/user/register", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

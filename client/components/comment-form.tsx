@@ -36,7 +36,7 @@ export default function CommentForm() {
             const token = localStorage.getItem("token")
 
             // Send POST request to the feedback endpoint
-            const response = await fetch("http://localhost:8000/feedback", {
+            const response = await fetch("https://p4sbu-yu75.onrender.com/feedback", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

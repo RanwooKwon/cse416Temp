@@ -86,7 +86,7 @@ export function ParkingAnalytics({
       try {
         setLoading((prev) => ({ ...prev, daily: true }));
         const response = await fetch(
-          `http://localhost:8000/parking/daily-pattern/${lotId}`
+          `https://p4sbu-yu75.onrender.com/parking/daily-pattern/${lotId}`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch daily pattern data");
@@ -116,7 +116,7 @@ export function ParkingAnalytics({
       try {
         setLoading((prev) => ({ ...prev, weekly: true }));
         const response = await fetch(
-          `http://localhost:8000/parking/weekly-pattern/${lotId}`
+          `https://p4sbu-yu75.onrender.com/parking/weekly-pattern/${lotId}`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch weekly pattern data");
@@ -147,7 +147,7 @@ export function ParkingAnalytics({
       try {
         setLoading((prev) => ({ ...prev, breakdown: true }));
         const response = await fetch(
-          `http://localhost:8000/parking/time-breakdown/${lotId}`
+          `https://p4sbu-yu75.onrender.com/parking/time-breakdown/${lotId}`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch time breakdown data");

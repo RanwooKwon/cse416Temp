@@ -46,7 +46,7 @@ export default function ParkingStatusPage() {
       try {
         setLoading(true);
         const response = await fetch(
-          "http://localhost:8000/parking/campus/list"
+          "https://p4sbu-yu75.onrender.com/parking/campus/list"
         );
         if (!response.ok) {
           throw new Error("Failed to fetch campus list");
@@ -76,7 +76,7 @@ export default function ParkingStatusPage() {
         setLoading(true);
         const encodedCampus = encodeURIComponent(selectedCampus);
         const response = await fetch(
-          `http://localhost:8000/parking/live-status/campus/${encodedCampus}`
+          `https://p4sbu-yu75.onrender.com/parking/live-status/campus/${encodedCampus}`
         );
         if (!response.ok) {
           throw new Error("Failed to fetch parking lots");
