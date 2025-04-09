@@ -51,6 +51,9 @@ interface ParkingLot {
   available?: number;
 }
 
+// Import hooks for URL search parameter parsing
+import { useSearchParams } from "next/navigation"
+
 // Main component for the reservations page.
 export default function ReservationsPage() {
   // --- State variables for form data ---
@@ -200,6 +203,39 @@ export default function ReservationsPage() {
       }
     }
   }, [startDate, endDate, startTime, endTime]); // Dependency array triggers validation when any time or date changes
+
+  // --- Effect for parsing URL search parameters ---
+  const searchParams = useSearchParams()
+  const [initialCampus, setInitialCampus] = useState<string | null>(null)
+
+  // Read lotId and lotLocation from URL params on mount
+  useEffect(() => {
+    const lotId = searchParams.get("lotId")
+    const lotLocation = searchParams.get("location")
+
+    if (lotId) {
+      setSelectedParkingLot(Number(lotId))
+    }
+
+    if (lotLocation) {
+      const parts = lotLocation.split(",")
+      const campus = parts.length > 1 ? parts[1].trim() : ""
+      setInitialCampus(campus)
+    }
+  }, [])
+
+  // After campuses are loaded, match and set the initial selected campus
+  useEffect(() => {
+    if (initialCampus && campuses.length > 0) {
+      const matched = campuses.find(c => c.trim() === initialCampus.trim())
+      if (matched) {
+        setSelectedCampus(matched)
+      } else {
+        console.warn("No matched campus found for", initialCampus)
+      }
+    }
+  }, [campuses, initialCampus])
+
 
   // --- Helper function to convert time string to an ISO string based on a given date ---
   // This function splits the time string, converts it to 24-hour format, then applies it to the date.

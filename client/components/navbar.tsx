@@ -71,6 +71,9 @@ export function Navbar() {
               <Link href="/parking-status" className="text-sm font-medium hover:text-primary-foreground/80">
                 Live Status
               </Link>
+              <Link href="/recommendation" className="text-sm font-medium hover:text-primary-foreground/80">
+                Parking Recommendation
+              </Link>
               <Link href="/feedback" className="text-sm font-medium hover:text-primary-foreground/80">
                 Feedback
               </Link>
