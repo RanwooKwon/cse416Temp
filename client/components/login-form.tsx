@@ -50,8 +50,9 @@ export default function LoginForm() {
       }
 
       const data = await response.json()
-      
-      localStorage.setItem("token", data.access_token)
+      console.log(data)
+
+      localStorage.setItem("token", data.token)
       localStorage.setItem("userId", data.userId.toString())
       
       window.dispatchEvent(new Event('storage'))

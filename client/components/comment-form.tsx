@@ -6,48 +6,86 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { StarFilledIcon, StarIcon } from "@radix-ui/react-icons"
 
 export default function CommentForm() {
-    const [comment, setComment] = useState("")
-    const [commentType, setCommentType] = useState<string>("feedback")
+    const [message, setMessage] = useState("")
+    const [type, setType] = useState<string>("General")
+    const [rating, setRating] = useState<number>(0)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const { toast } = useToast()
+
+    // Available feedback types
+    const feedbackTypes = ["General", "Bug Report", "Feature Request", "Support", "Complaint"]
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
 
         try {
-            // In a real application, this would be an API call
-            // await fetch("/api/comments", {
-            //   method: "POST",
-            //   headers: { "Content-Type": "application/json" },
-            //   body: JSON.stringify({ comment, commentType }),
-            // })
+            // Prepare the request payload
+            const payload = {
+                message,
+                rating,
+                reply: "", // Empty string as per the required format
+                type,
+            }
+            const token = localStorage.getItem("token")
 
-            // Simulate API delay
-            await new Promise((resolve) => setTimeout(resolve, 1000))
+            // Send POST request to the feedback endpoint
+            const response = await fetch("http://localhost:8000/feedback", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(payload),
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.message || "Failed to submit feedback")
+            }
 
             // Show success message
             toast({
-                title: "Comment submitted",
+                title: "Feedback submitted",
                 description: "Thank you for your feedback!",
             })
 
             // Reset form
-            setComment("")
+            setMessage("")
+            setRating(0)
+            setType("General")
         } catch (error) {
             toast({
                 title: "Error",
-                description: "Failed to submit your comment. Please try again.",
+                description: error instanceof Error ? error.message : "Failed to submit your feedback. Please try again.",
                 variant: "destructive",
             })
         } finally {
             setIsSubmitting(false)
         }
+    }
+
+    // Render stars for rating
+    const renderStars = () => {
+        return (
+            <div className="flex items-center space-x-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                    <button key={star} type="button" onClick={() => setRating(star)} className="focus:outline-none">
+                        {star <= rating ? (
+                            <StarFilledIcon className="h-6 w-6 text-yellow-500" />
+                        ) : (
+                            <StarIcon className="h-6 w-6 text-gray-300 hover:text-yellow-500" />
+                        )}
+                    </button>
+                ))}
+            </div>
+        )
     }
 
     return (
@@ -59,27 +97,33 @@ export default function CommentForm() {
             <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="commentType">Feedback Type</Label>
-                        <Select value={commentType} onValueChange={setCommentType}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select feedback type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="feedback">General Feedback</SelectItem>
-                                <SelectItem value="suggestion">Suggestion</SelectItem>
-                                <SelectItem value="issue">Report Issue</SelectItem>
-                                <SelectItem value="question">Question</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <Label htmlFor="feedbackType">Feedback Type</Label>
+                        <ToggleGroup
+                            type="single"
+                            value={type}
+                            onValueChange={(value) => value && setType(value)}
+                            className="flex flex-wrap gap-2"
+                        >
+                            {feedbackTypes.map((feedbackType) => (
+                                <ToggleGroupItem key={feedbackType} value={feedbackType} className="px-3 py-2 text-sm">
+                                    {feedbackType}
+                                </ToggleGroupItem>
+                            ))}
+                        </ToggleGroup>
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="comment">Your Comment</Label>
+                        <Label htmlFor="rating">Rating</Label>
+                        {renderStars()}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="message">Your Message</Label>
                         <Textarea
-                            id="comment"
+                            id="message"
                             placeholder="Type your feedback here..."
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
                             rows={5}
                             required
                         />
