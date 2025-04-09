@@ -174,7 +174,7 @@ Find nearest available parking lots with enhanced options.
 import requests
 
 # Get forecast for parking lot 3 for the next 8 hours
-response = requests.get("http://localhost:8000/parking/forecast/3?hours_ahead=8")
+response = requests.get("https://p4sbu-yu75.onrender.com/parking/forecast/3?hours_ahead=8")
 forecast = response.json()
 
 # Print congestion levels for each hour
@@ -188,7 +188,7 @@ for hour in forecast["forecast"]:
 import requests
 
 # Find the best time to park in lot 5 within the next 24 hours
-response = requests.get("http://localhost:8000/parking/best-time/5")
+response = requests.get("https://p4sbu-yu75.onrender.com/parking/best-time/5")
 best_time = response.json()
 
 print(f"Best time to park: {best_time['best_time']}")
@@ -213,7 +213,7 @@ params = {
     "limit": 3
 }
 
-response = requests.get("http://localhost:8000/parking/nearest", params=params)
+response = requests.get("https://p4sbu-yu75.onrender.com/parking/nearest", params=params)
 nearest_lots = response.json()
 
 for lot in nearest_lots:
@@ -279,12 +279,12 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 2. The API will be available at:
-   - Local access: http://localhost:8000
+   - Local access: https://p4sbu-yu75.onrender.com
    - Network access: http://your-ip-address:8000
 
 3. Access the API documentation at:
-   - Swagger UI: http://localhost:8000/docs
-   - ReDoc: http://localhost:8000/redoc
+   - Swagger UI: https://p4sbu-yu75.onrender.com/docs
+   - ReDoc: https://p4sbu-yu75.onrender.com/redoc
 
 ## API Documentation
 

@@ -9,7 +9,7 @@ import sys
 import asyncio.exceptions
 
 NUM_USERS = 1000
-BASE_URL = "http://localhost:8000"
+BASE_URL = "https://p4sbu-yu75.onrender.com"
 USER_ID = 6
 PARKING_LOT_IDS = [1, 2, 3, 4, 5]
 

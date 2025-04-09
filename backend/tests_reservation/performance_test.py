@@ -12,7 +12,7 @@ import tabulate as tabulate_module
 
 
 class ParkingLoadTest:
-    def __init__(self, base_url="http://localhost:8000", users=1000, concurrent_limit=100):
+    def __init__(self, base_url="https://p4sbu-yu75.onrender.com", users=1000, concurrent_limit=100):
         self.base_url = base_url
         self.num_users = users
         self.concurrent_limit = concurrent_limit
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="P4SBU Parking System Load Testing Tool")
     parser.add_argument("-u", "--users", type=int, default=1000, help="Number of users to simulate")
     parser.add_argument("-c", "--concurrent", type=int, default=100, help="Maximum number of concurrent requests")
-    parser.add_argument("--url", type=str, default="http://localhost:8000", help="Base URL for the API")
+    parser.add_argument("--url", type=str, default="https://p4sbu-yu75.onrender.com", help="Base URL for the API")
 
     args = parser.parse_args()
 
