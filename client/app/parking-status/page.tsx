@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import {
-  Card, 
+  Card,
   CardContent,
   CardDescription,
   CardHeader,
