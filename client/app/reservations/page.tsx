@@ -2,7 +2,7 @@
 
 // Import necessary React hooks and types
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 
 // Import date utility functions from date-fns for date manipulation and formatting
 import { format, addDays } from "date-fns";
@@ -55,7 +55,7 @@ interface ParkingLot {
 import { useSearchParams } from "next/navigation"
 
 // Main component for the reservations page.
-export default function ReservationsPage() {
+function ReservationsPageContent() {
   // --- State variables for form data ---
   // Campus selected by the user (a string identifier).
   const [selectedCampus, setSelectedCampus] = useState<string>("");
@@ -648,5 +648,13 @@ export default function ReservationsPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function ReservationsPage() {
+  return (
+    <Suspense fallback={<div>Loading reservation page...</div>}>
+      <ReservationsPageContent />
+    </Suspense>
   );
 }
