@@ -339,7 +339,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "https://p4-sbu.vercel.app", "https://cse416-temp-9noc.vercel.app", "https://cse416temp.onrender.com"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "https://p4-sbu.vercel.app", "https://cse416-temp-9noc.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

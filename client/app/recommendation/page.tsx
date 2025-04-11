@@ -71,8 +71,6 @@ export default function RecommendationPage() {
     return data.sort((a: any, b: any) => a.distance - b.distance)
   }
 
-  // const response = await fetch(`https://cse416temp.onrender.com/parking/nearest?${params.toString()}`)
-
   const drawPolyline = (coords: any[]) => {
     if (!mapRef.current) return
     clearPolyline()
