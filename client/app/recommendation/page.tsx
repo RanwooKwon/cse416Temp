@@ -69,7 +69,7 @@ export default function RecommendationPage() {
       prefer_ev: preferEv ? "true" : "false",
     });
   
-    const response = await fetch(`https://p4sbu-yu75.onrender.com/parking/nearest?${params.toString()}`)
+    const response = await fetch(`https://cse416temp.onrender.com/parking/nearest?${params.toString()}`)
     if (!response.ok) throw new Error("Failed to fetch nearest parking lots");
     const data = await response.json();
     return data.sort((a: any, b: any) => a.distance - b.distance);
