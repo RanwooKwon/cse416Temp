@@ -337,13 +337,13 @@ async def get_current_admin(
 
 app = FastAPI(lifespan=lifespan)
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:3000", "http://localhost:3001", "https://p4-sbu.vercel.app", "https://cse416-temp-9noc.vercel.app"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "https://p4-sbu.vercel.app", "https://cse416-temp-9noc.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------------------- NEW PYDANTIC MODELS ---------------------- #
