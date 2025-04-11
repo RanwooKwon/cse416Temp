@@ -61,14 +61,18 @@ export default function RecommendationPage() {
   }
 
   const findNearestParkingLots = async (latitude: number, longitude: number, limit: number, preferEv: boolean) => {
-    const response = await fetch("https://cse416temp.onrender.com/parking/nearest", {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ start_lat: latitude, start_lng: longitude, limit, min_available: 1, prefer_ev: preferEv }),
-    })
-    if (!response.ok) throw new Error("Failed to fetch nearest parking lots")
-    const data = await response.json()
-    return data.sort((a: any, b: any) => a.distance - b.distance)
+    const params = new URLSearchParams({
+      start_lat: latitude.toString(),
+      start_lng: longitude.toString(),
+      limit: limit.toString(),
+      min_available: "1",
+      prefer_ev: preferEv ? "true" : "false",
+    });
+  
+    const response = await fetch(`https://cse416temp.onrender.com/parking/nearest?${params.toString()}`)
+    if (!response.ok) throw new Error("Failed to fetch nearest parking lots");
+    const data = await response.json();
+    return data.sort((a: any, b: any) => a.distance - b.distance);
   }
 
   const drawPolyline = (coords: any[]) => {
