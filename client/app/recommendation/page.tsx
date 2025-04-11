@@ -61,7 +61,7 @@ export default function RecommendationPage() {
   }
 
   const findNearestParkingLots = async (latitude: number, longitude: number, limit: number, preferEv: boolean) => {
-    const response = await fetch("http://p4sbu-yu75.onrender.com/parking/nearest", {
+    const response = await fetch("https://p4sbu-yu75.onrender.com/parking/nearest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ start_lat: latitude, start_lng: longitude, limit, min_available: 1, prefer_ev: preferEv }),
